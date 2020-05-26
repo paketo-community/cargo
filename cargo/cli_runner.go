@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/pexec"
 )
 
@@ -26,13 +27,27 @@ func NewCLIRunner(exec Executable) CLIRunner {
 	}
 }
 
-// Build a project using `cargo build`
-func (c CLIRunner) Build(workDir string) error {
+// Install will build and install a project using `cargo install`
+func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer packit.Layer) error {
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("CARGO_TARGET_DIR=%s", workLayer.Path))
+
 	err := c.exec.Execute(pexec.Execution{
-		Dir:    workDir,
+		Dir:    srcDir,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
-		Args:   []string{},
+		Env:    env,
+		Args: []string{
+			"install",
+			"--color=never",
+			"--path=.",
+			fmt.Sprintf("--root=%s", destLayer.Path),
+		},
+		// TODO: see if can make this warning go away, maybe add that to the path
+		//    [builder] warning: be sure to add `/layers/com.mikusa.rust-cargo/rust-bin/bin` to your PATH to be able to run the installed binaries
+		// TODO: look at adding --frozen or --locked
+		// TODO: --offline, maybe?
+		// TODO: pull in extra args from an env variable
 	})
 	if err != nil {
 		return fmt.Errorf("build failed: %w", err)

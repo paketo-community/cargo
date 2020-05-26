@@ -53,7 +53,11 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		buffer = bytes.NewBuffer(nil)
 
 		mockRunner := mocks.Runner{}
-		mockRunner.On("Build", workingDir).Return(nil)
+		mockRunner.On(
+			"Install",
+			workingDir,
+			mock.AnythingOfType("packit.Layer"),
+			mock.AnythingOfType("packit.Layer")).Return(nil)
 
 		mockSummer := mocks.Summer{}
 		mockSummer.On("Sum", mock.MatchedBy(func(s string) bool {
@@ -99,12 +103,26 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 							"cache_sha": "12345",
 						},
 					},
+					{
+						Name:      "rust-bin",
+						Path:      filepath.Join(layersDir, "rust-bin"),
+						Build:     false,
+						Launch:    true,
+						Cache:     false,
+						SharedEnv: packit.Environment{},
+						BuildEnv:  packit.Environment{},
+						LaunchEnv: packit.Environment{},
+						Metadata: map[string]interface{}{
+							"built_at": timestamp,
+						},
+					},
 				},
 			}))
 		})
 
 		it("skips build", func() {
 			Expect(ioutil.WriteFile(filepath.Join(layersDir, "rust-cargo.toml"), []byte("launch = false\nbuild = true\ncache = true\n\n[metadata]\ncache_sha = \"12345\"\nbuilt_at = \"some_time\""), 0644)).To(Succeed())
+			Expect(ioutil.WriteFile(filepath.Join(layersDir, "rust-bin.toml"), []byte("launch = true\nbuild = false\ncache = false\n\n[metadata]\nbuilt_at = \"some_time\""), 0644)).To(Succeed())
 
 			result, err := build(packit.BuildContext{
 				WorkingDir: workingDir,
@@ -130,6 +148,19 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 						Metadata: map[string]interface{}{
 							"built_at":  "some_time",
 							"cache_sha": "12345",
+						},
+					},
+					{
+						Name:      "rust-bin",
+						Path:      filepath.Join(layersDir, "rust-bin"),
+						Build:     false,
+						Launch:    true,
+						Cache:     false,
+						SharedEnv: packit.Environment{},
+						BuildEnv:  packit.Environment{},
+						LaunchEnv: packit.Environment{},
+						Metadata: map[string]interface{}{
+							"built_at": "some_time",
 						},
 					},
 				},
@@ -161,7 +192,12 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		context("cargo build fails", func() {
 			it.Before(func() {
 				mockRunner := mocks.Runner{}
-				mockRunner.On("Build", workingDir).Return(fmt.Errorf("expected"))
+				mockRunner.On(
+					"Install",
+					workingDir,
+					mock.AnythingOfType("packit.Layer"),
+					mock.AnythingOfType("packit.Layer"),
+				).Return(fmt.Errorf("expected"))
 
 				mockSummer := mocks.Summer{}
 				mockSummer.On("Sum", mock.MatchedBy(func(s string) bool {

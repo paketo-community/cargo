@@ -19,7 +19,7 @@ type Summer interface {
 
 // Runner is something capable of running Cargo
 type Runner interface {
-	Build(workDir string) error
+	Install(srcDir string, workLayer packit.Layer, destLayer packit.Layer) error
 }
 
 // Build does the actual install of Rust
@@ -33,17 +33,22 @@ func Build(runner Runner, summer Summer, clock Clock, logger *scribe.Logger) pac
 			return packit.BuildResult{}, err
 		}
 
+		binaryLayer, err := context.Layers.Get("rust-bin", packit.LaunchLayer)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
 		cargoLockHash, err := summer.Sum(filepath.Join(context.WorkingDir, "Cargo.lock"))
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
 
 		if sha, ok := cargoLayer.Metadata["cache_sha"].(string); !ok || sha != cargoLockHash {
+			logger.Subprocess("Project needs to be built")
 			logger.Break()
-			logger.Subprocess("Running Cargo Build")
 
 			then := clock.Now()
-			err := runner.Build(context.WorkingDir)
+			err := runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
 			if err != nil {
 				return packit.BuildResult{}, err
 			}
@@ -55,11 +60,19 @@ func Build(runner Runner, summer Summer, clock Clock, logger *scribe.Logger) pac
 				"built_at":  clock.Now().Format(time.RFC3339Nano),
 				"cache_sha": cargoLockHash,
 			}
+
+			binaryLayer.Metadata = map[string]interface{}{
+				"built_at": clock.Now().Format(time.RFC3339Nano),
+			}
+		} else {
+			logger.Subprocess("No change, reusing")
+			logger.Break()
 		}
 
 		return packit.BuildResult{
 			Layers: []packit.Layer{
 				cargoLayer,
+				binaryLayer,
 			},
 		}, nil
 	}

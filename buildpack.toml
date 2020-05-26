@@ -2,7 +2,7 @@ api = "0.2"
 
 [buildpack]
   id = "com.mikusa.rust-cargo"
-  name = "Rust Carbo Build Pack"
+  name = "Rust Cargo Build Pack"
   version = "0.0.1"
   homepage = "https://github.com/dmikusa/rust-cargo-cnb"
 
