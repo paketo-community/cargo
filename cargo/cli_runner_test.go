@@ -3,6 +3,8 @@ package cargo_test
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dmikusa/rust-cargo-cnb/cargo"
@@ -28,6 +30,12 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 		it.Before(func() {
 			env := os.Environ()
 			env = append(env, `CARGO_TARGET_DIR=/some/location/1`)
+
+			for i := 0; i < len(env); i++ {
+				if strings.HasPrefix(env[i], "PATH=") {
+					env[i] = fmt.Sprintf("%s%c%s", env[i], os.PathListSeparator, filepath.Join(destLayer.Path, "bin"))
+				}
+			}
 
 			mockExe := mocks.Executable{}
 			execution := pexec.Execution{
@@ -58,6 +66,12 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 		it.Before(func() {
 			env := os.Environ()
 			env = append(env, `CARGO_TARGET_DIR=/some/location/1`)
+
+			for i := 0; i < len(env); i++ {
+				if strings.HasPrefix(env[i], "PATH=") {
+					env[i] = fmt.Sprintf("%s%c%s", env[i], os.PathListSeparator, filepath.Join(destLayer.Path, "bin"))
+				}
+			}
 
 			mockExe := mocks.Executable{}
 			execution := pexec.Execution{

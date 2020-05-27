@@ -3,6 +3,8 @@ package cargo
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/pexec"
@@ -32,6 +34,12 @@ func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer pack
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("CARGO_TARGET_DIR=%s", workLayer.Path))
 
+	for i := 0; i < len(env); i++ {
+		if strings.HasPrefix(env[i], "PATH=") {
+			env[i] = fmt.Sprintf("%s%c%s", env[i], os.PathListSeparator, filepath.Join(destLayer.Path, "bin"))
+		}
+	}
+
 	err := c.exec.Execute(pexec.Execution{
 		Dir:    srcDir,
 		Stdout: os.Stdout,
@@ -43,8 +51,6 @@ func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer pack
 			"--path=.",
 			fmt.Sprintf("--root=%s", destLayer.Path),
 		},
-		// TODO: see if can make this warning go away, maybe add that to the path
-		//    [builder] warning: be sure to add `/layers/com.mikusa.rust-cargo/rust-bin/bin` to your PATH to be able to run the installed binaries
 		// TODO: look at adding --frozen or --locked
 		// TODO: --offline, maybe?
 		// TODO: pull in extra args from an env variable
