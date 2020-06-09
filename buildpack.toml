@@ -3,7 +3,7 @@ api = "0.2"
 [buildpack]
   id = "com.mikusa.rust-cargo"
   name = "Rust Cargo Build Pack"
-  version = "0.0.1"
+  version = "0.0.2"
   homepage = "https://github.com/dmikusa/rust-cargo-cnb"
 
 [[stacks]]
@@ -11,6 +11,9 @@ api = "0.2"
 
 [[stacks]]
   id = "org.cloudfoundry.stacks.cflinuxfs3"
+
+[[stacks]]
+  id = "io.paketo.stacks.tiny"
 
 [metadata]
   include_files = ["bin/build", "bin/detect", "buildpack.toml"]
