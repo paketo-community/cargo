@@ -1,10 +1,10 @@
-api = "0.2"
+api = "0.4"
 
 [buildpack]
-  id = "com.mikusa.rust-cargo"
+  id = "paketo-community/cargo-install"
   name = "Rust Cargo Build Pack"
-  version = "0.0.2"
-  homepage = "https://github.com/dmikusa/rust-cargo-cnb"
+  version = "0.0.3"
+  homepage = "https://github.com/paketo-community/cargo-install"
 
 [[stacks]]
   id = "io.buildpacks.stacks.bionic"
