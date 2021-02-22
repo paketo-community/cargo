@@ -13,6 +13,7 @@ import (
 	"github.com/dmikusa/rust-cargo-cnb/cargo"
 	"github.com/dmikusa/rust-cargo-cnb/cargo/mocks"
 	"github.com/paketo-buildpacks/packit"
+	"github.com/paketo-buildpacks/packit/chronos"
 	"github.com/paketo-buildpacks/packit/scribe"
 	"github.com/sclevine/spec"
 	"github.com/stretchr/testify/mock"
@@ -28,12 +29,11 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		layersDir  string
 		cnbPath    string
 		timestamp  string
+		buffer     *bytes.Buffer
 
-		clock cargo.Clock
+		clock chronos.Clock
 
 		build packit.BuildFunc
-
-		buffer *bytes.Buffer
 	)
 
 	it.Before(func() {
@@ -48,7 +48,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(err).NotTo(HaveOccurred())
 
 		now := time.Now()
-		clock = cargo.NewClock(func() time.Time { return now })
+		clock = chronos.NewClock(func() time.Time { return now })
 		timestamp = now.Format(time.RFC3339Nano)
 		buffer = bytes.NewBuffer(nil)
 
@@ -64,9 +64,9 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			return strings.HasSuffix(s, "Cargo.lock")
 		})).Return("12345", nil)
 
-		logger := scribe.NewLogger(buffer)
+		logger := scribe.NewEmitter(buffer)
 
-		build = cargo.Build(&mockRunner, &mockSummer, clock, &logger)
+		build = cargo.Build(&mockRunner, &mockSummer, clock, logger)
 	})
 
 	it.After(func() {
@@ -204,9 +204,9 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 					return strings.HasSuffix(s, "Cargo.lock")
 				})).Return("12345", nil)
 
-				logger := scribe.NewLogger(buffer)
+				logger := scribe.NewEmitter(buffer)
 
-				build = cargo.Build(&mockRunner, &mockSummer, clock, &logger)
+				build = cargo.Build(&mockRunner, &mockSummer, clock, logger)
 			})
 
 			it("returns an error", func() {

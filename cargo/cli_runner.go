@@ -10,7 +10,7 @@ import (
 	"github.com/paketo-buildpacks/packit/pexec"
 )
 
-//go:generate mockery -name Executable -case=underscore
+//go:generate mockery --name Executable --case=underscore
 
 // Executable allows for mocking the pexec.Executable
 type Executable interface {
