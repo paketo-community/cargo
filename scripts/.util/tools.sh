@@ -1,135 +1,115 @@
 #!/usr/bin/env bash
+
 set -eu
 set -o pipefail
 
-# shellcheck source=./print.sh
+# shellcheck source=SCRIPTDIR/print.sh
 source "$(dirname "${BASH_SOURCE[0]}")/print.sh"
 
-# shellcheck source=./git.sh
-source "$(dirname "${BASH_SOURCE[0]}")/git.sh"
-
 function util::tools::path::export() {
-    local dir
-    dir="${1}"
+  local dir
+  dir="${1}"
 
-    if ! echo "${PATH}" | grep -q "${dir}"; then
-        PATH="${dir}:$PATH"
-        export PATH
-    fi
-}
-
-function util::tools::pack::install() {
-    local dir version os
-
-    util::print::title "Installing pack"
-
-    while [[ "${#}" != 0 ]]; do
-      case "${1}" in
-        --directory)
-          dir="${2}"
-          shift 2
-          ;;
-
-        --version)
-          version="${2}"
-          shift 2
-          ;;
-
-        *)
-          util::print::error "unknown argument \"${1}\""
-      esac
-    done
-
-    mkdir -p "${dir}"
-    util::tools::path::export "${dir}"
-
-    os="$(uname -s)"
-
-    if [[ "${os}" == "Darwin" ]]; then
-        os="macos"
-    elif [[ "${os}" == "Linux" ]]; then
-        os="linux"
-    else
-        util::print::error "Unsupported operating system"
-    fi
-
-    if [[ ! -f "${dir}/pack" ]]; then
-        util::print::info "--> installing..."
-    elif [[ "$("${dir}/pack" version | cut -d ' ' -f 1)" != *${version}* ]]; then
-        rm "${dir}/pack"
-        util::print::info "--> updating..."
-    else
-        util::print::info "--> skipping..."
-        return 0
-    fi
-
-    GIT_TOKEN="$(util::git::token::fetch)"
-
-    if [[ "${version}" == "latest" ]]; then
-        local url
-        if [[ "${os}" == "macos" ]]; then
-            url="$(
-                curl -s \
-                    -H "Authorization: token ${GIT_TOKEN}" \
-                    https://api.github.com/repos/buildpacks/pack/releases/latest \
-                    | jq --raw-output '.assets[1] | .browser_download_url'
-                )"
-        else
-            url="$(
-                curl -s \
-                    -H "Authorization: token ${GIT_TOKEN}" \
-                    https://api.github.com/repos/buildpacks/pack/releases/latest \
-                    | jq --raw-output '.assets[0] | .browser_download_url'
-                )"
-        fi
-        util::tools::pack::expand "${dir}" "${url}"
-    else
-        local tarball
-        tarball="pack-${version}-${os}.tar.gz"
-        url="https://github.com/buildpacks/pack/releases/download/v${version}/${tarball}"
-        util::tools::pack::expand "${dir}" "${url}"
-    fi
-}
-
-function util::tools::pack::expand() {
-    local dir url version
-    dir="${1}"
-    url="${2}"
-    tarball="$(echo "${url}" | sed "s/.*\///")"
-    version="v$(echo "${url}" | sed 's/pack-//' | sed 's/-.*//')"
-
-    curl --location --silent --output "${tarball}" "${url}"
-    tar xzf "${tarball}" -C "${dir}"
-    rm "${tarball}"
+  if ! echo "${PATH}" | grep -q "${dir}"; then
+    PATH="${dir}:$PATH"
+    export PATH
+  fi
 }
 
 function util::tools::jam::install () {
-    local dir
+  local dir
+  while [[ "${#}" != 0 ]]; do
+    case "${1}" in
+      --directory)
+        dir="${2}"
+        shift 2
+        ;;
 
-    while [[ "${#}" != 0 ]]; do
-      case "${1}" in
-        --directory)
-          dir="${2}"
-          shift 2
-          ;;
+      *)
+        util::print::error "unknown argument \"${1}\""
+    esac
+  done
 
-        *)
-          util::print::error "unknown argument \"${1}\""
-      esac
-    done
+  local os
+  case "$(uname)" in
+    "Darwin")
+      os="darwin"
+      ;;
 
-    mkdir -p "${dir}"
-    util::tools::path::export "${dir}"
+    "Linux")
+      os="linux"
+      ;;
 
-    if [[ ! -f "${dir}/jam" ]]; then
-        util::print::title "Installing jam"
-        GOBIN="${dir}" go install github.com/cloudfoundry/packit/cargo/jam
-    fi
+    *)
+      echo "Unknown OS \"$(uname)\""
+      exit 1
+  esac
+
+  mkdir -p "${dir}"
+  util::tools::path::export "${dir}"
+
+  if [[ ! -f "${dir}/jam" ]]; then
+    local version
+    version="$(jq -r .jam "$(dirname "${BASH_SOURCE[0]}")/tools.json")"
+
+    util::print::title "Installing jam ${version}"
+    curl "https://github.com/paketo-buildpacks/packit/releases/download/${version}/jam-${os}" \
+      --silent \
+      --location \
+      --output "${dir}/jam"
+    chmod +x "${dir}/jam"
+  fi
+}
+
+function util::tools::pack::install() {
+  local dir
+  while [[ "${#}" != 0 ]]; do
+    case "${1}" in
+      --directory)
+        dir="${2}"
+        shift 2
+        ;;
+
+      *)
+        util::print::error "unknown argument \"${1}\""
+    esac
+  done
+
+  mkdir -p "${dir}"
+  util::tools::path::export "${dir}"
+
+  local os
+  case "$(uname)" in
+    "Darwin")
+      os="macos"
+      ;;
+
+    "Linux")
+      os="linux"
+      ;;
+
+    *)
+      echo "Unknown OS \"$(uname)\""
+      exit 1
+  esac
+
+  if [[ ! -f "${dir}/pack" ]]; then
+    local version
+    version="$(jq -r .pack "$(dirname "${BASH_SOURCE[0]}")/tools.json")"
+
+    util::print::title "Installing pack ${version}"
+    curl "https://github.com/buildpacks/pack/releases/download/${version}/pack-${version}-${os}.tgz" \
+      --silent \
+      --location \
+      --output /tmp/pack.tgz
+    tar xzf /tmp/pack.tgz -C "${dir}"
+    chmod +x "${dir}/pack"
+    rm /tmp/pack.tgz
+  fi
 }
 
 function util::tools::packager::install () {
     local dir
-
     while [[ "${#}" != 0 ]]; do
       case "${1}" in
         --directory)
@@ -139,6 +119,8 @@ function util::tools::packager::install () {
 
         *)
           util::print::error "unknown argument \"${1}\""
+          ;;
+
       esac
     done
 
@@ -146,7 +128,17 @@ function util::tools::packager::install () {
     util::tools::path::export "${dir}"
 
     if [[ ! -f "${dir}/packager" ]]; then
-        util::print::title "Installing packager"
-        GOBIN="${dir}" go install github.com/cloudfoundry/libcfbuildpack/packager
+      util::print::title "Installing packager"
+      GOBIN="${dir}" go get -u github.com/cloudfoundry/libcfbuildpack/packager
     fi
+}
+
+function util::tools::tests::checkfocus() {
+  testout="${1}"
+  if grep -q 'Focused: [1-9]' "${testout}"; then
+    echo "Detected Focused Test(s) - setting exit code to 197"
+    rm "${testout}"
+    util::print::success "** GO Test Succeeded **" 197
+  fi
+  rm "${testout}"
 }
