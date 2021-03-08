@@ -3,7 +3,6 @@ api = "0.4"
 [buildpack]
   id = "paketo-community/cargo-install"
   name = "Rust Cargo Build Pack"
-  version = "0.0.3"
   homepage = "https://github.com/paketo-community/cargo-install"
 
 [[stacks]]
@@ -16,5 +15,5 @@ api = "0.4"
   id = "io.paketo.stacks.tiny"
 
 [metadata]
-  include_files = ["bin/build", "bin/detect", "buildpack.toml"]
-  pre_package = "./scripts/build.sh"
+  include-files = ["bin/build", "bin/detect", "buildpack.toml"]
+  pre-package = "./scripts/build.sh"
