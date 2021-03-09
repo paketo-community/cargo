@@ -3,14 +3,13 @@ module github.com/dmikusa/rust-cargo-cnb
 go 1.14
 
 require (
-	github.com/cheggaaa/pb/v3 v3.0.6 // indirect
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/mattn/go-runewidth v0.0.10 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onsi/ginkgo v1.15.0 // indirect
 	github.com/onsi/gomega v1.11.0
-	github.com/paketo-buildpacks/packit v0.7.0
+	github.com/paketo-buildpacks/packit v0.8.0
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/objx v0.3.0 // indirect
