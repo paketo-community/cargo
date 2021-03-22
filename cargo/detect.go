@@ -12,6 +12,12 @@ import (
 // PlanDependencyRustCargo is the name of the plan
 const PlanDependencyRustCargo = "rust-cargo"
 
+// BuildPlanMetadata defines the information stored in the build plan
+type BuildPlanMetadata struct {
+	VersionSource string `toml:"version-source"`
+	Version       string `toml:"version"`
+}
+
 // Detect if the Rust binaries should be delivered
 func Detect() packit.DetectFunc {
 	return func(context packit.DetectContext) (packit.DetectResult, error) {
@@ -38,7 +44,13 @@ func Detect() packit.DetectFunc {
 				},
 				Requires: []packit.BuildPlanRequirement{
 					{Name: PlanDependencyRustCargo},
-					{Name: "rust"},
+					{
+						Name: "rust",
+						Metadata: BuildPlanMetadata{
+							Version:       "",
+							VersionSource: "CARGO",
+						},
+					},
 				},
 			},
 		}, nil
