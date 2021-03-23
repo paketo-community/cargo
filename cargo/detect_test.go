@@ -53,7 +53,13 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 					},
 					Requires: []packit.BuildPlanRequirement{
 						{Name: cargo.PlanDependencyRustCargo},
-						{Name: "rust"},
+						{
+							Name: "rust",
+							Metadata: cargo.BuildPlanMetadata{
+								Version:       "",
+								VersionSource: "CARGO",
+							},
+						},
 					},
 				},
 			}))
