@@ -15,5 +15,5 @@ api = "0.4"
   id = "io.paketo.stacks.tiny"
 
 [metadata]
-  include-files = ["bin/build", "bin/detect", "buildpack.toml"]
+  include-files = ["bin/run", "bin/build", "bin/detect", "buildpack.toml"]
   pre-package = "./scripts/build.sh"
