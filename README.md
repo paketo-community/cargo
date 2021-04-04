@@ -4,6 +4,26 @@ The Rust Cargo Install Buildpack is a Cloud Native Buildpack V3 that build Rust 
 
 This buildpack is designed to work in collaboration with the [Rust Dist CNB](https://github.com/paketo-community/rust-dist) buildpacks which provides the actual Rust and Cargo binaries used by this buildpack.
 
+## Configuration
+
+### BP_CARGO_INSTALL_ARGS
+
+By default, the buildpack will run `cargo install --color=never --root=<destination layer> --path=.`, which will build the code and install a single binary. This works for a single project that exists at the root of the application project. It does not work if you have a workspace or multiple binaries in your project (unless you've set a default binary).
+
+To be more flexible and allow building additional projects, you may use this environment variable to pass additional arguments to `cargo install`.
+
+For example:
+
+- `--path=./todo` to build a single member in a folder called `./todo` that is part of a workspace
+- `--bins` to build all binaries in your project
+- `--bin=foo` to specifically build the foo binary when multiple binaries are present
+- `-v` to get more verbose output from `cargo install`
+- `--frozen` or `--locked` or customizing how Cargo will use the Cargo.lock file
+- `--offline` for preventing Cargo from trying to access the Internet
+- or any other valid arguments that can be passed to `cargo install`
+
+You may **not** set `--color` and you may not set `--root`. These are fixed by the buildpack in order to make output look correct and to ensure that binaries are installed into the proper location.
+
 ## Detection
 
 The detection phase passes if both of the following conditions hold true:
