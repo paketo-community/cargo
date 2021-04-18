@@ -37,13 +37,22 @@ func Build(runner Runner, clock chronos.Clock, logger scribe.Emitter) packit.Bui
 		binaryLayer.Launch = true
 
 		then := clock.Now()
+
 		preserver := mtimes.NewPreserver(logger)
-		preserver.Restore(cargoLayer.Path)
+		err = preserver.Restore(cargoLayer.Path)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
 		err = runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
-		preserver.Preserve(cargoLayer.Path)
+
+		err = preserver.Preserve(cargoLayer.Path)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
 
 		logger.Action("Completed in %s", time.Since(then).Round(time.Millisecond))
 		logger.Break()
