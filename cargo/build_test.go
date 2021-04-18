@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -59,14 +58,9 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			mock.AnythingOfType("packit.Layer"),
 			mock.AnythingOfType("packit.Layer")).Return(nil)
 
-		mockSummer := mocks.Summer{}
-		mockSummer.On("Sum", mock.MatchedBy(func(s string) bool {
-			return strings.HasSuffix(s, "Cargo.lock")
-		})).Return("12345", nil)
-
 		logger := scribe.NewEmitter(buffer)
 
-		build = cargo.Build(&mockRunner, &mockSummer, clock, logger)
+		build = cargo.Build(&mockRunner, clock, logger)
 	})
 
 	it.After(func() {
@@ -76,7 +70,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	context("build cases", func() {
-		it("builds fresh", func() {
+		it("builds", func() {
 			result, err := build(packit.BuildContext{
 				WorkingDir: workingDir,
 				Layers:     packit.Layers{Path: layersDir},
@@ -92,7 +86,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 					{
 						Name:             "rust-cargo",
 						Path:             filepath.Join(layersDir, "rust-cargo"),
-						Build:            true,
+						Build:            false,
 						Cache:            true,
 						Launch:           false,
 						SharedEnv:        packit.Environment{},
@@ -100,8 +94,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 						LaunchEnv:        packit.Environment{},
 						ProcessLaunchEnv: map[string]packit.Environment{},
 						Metadata: map[string]interface{}{
-							"built_at":  timestamp,
-							"cache_sha": "12345",
+							"built_at": timestamp,
 						},
 					},
 					{
@@ -120,56 +113,6 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 					},
 				},
 			}))
-		})
-
-		it("skips build", func() {
-			Expect(ioutil.WriteFile(filepath.Join(layersDir, "rust-cargo.toml"), []byte("launch = false\nbuild = true\ncache = true\n\n[metadata]\ncache_sha = \"12345\"\nbuilt_at = \"some_time\""), 0644)).To(Succeed())
-			Expect(ioutil.WriteFile(filepath.Join(layersDir, "rust-bin.toml"), []byte("launch = true\nbuild = false\ncache = false\n\n[metadata]\nbuilt_at = \"some_time\""), 0644)).To(Succeed())
-
-			result, err := build(packit.BuildContext{
-				WorkingDir: workingDir,
-				Layers:     packit.Layers{Path: layersDir},
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{
-						{Name: "rust"},
-					},
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(packit.BuildResult{
-				Layers: []packit.Layer{
-					{
-						Name:             "rust-cargo",
-						Path:             filepath.Join(layersDir, "rust-cargo"),
-						Build:            true,
-						Cache:            true,
-						Launch:           false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at":  "some_time",
-							"cache_sha": "12345",
-						},
-					},
-					{
-						Name:             "rust-bin",
-						Path:             filepath.Join(layersDir, "rust-bin"),
-						Build:            false,
-						Launch:           true,
-						Cache:            false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at": "some_time",
-						},
-					},
-				},
-			}))
-			Expect(buffer.String()).ToNot(ContainSubstring("Running Cargo Build"))
 		})
 	})
 
@@ -203,14 +146,9 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 					mock.AnythingOfType("packit.Layer"),
 				).Return(fmt.Errorf("expected"))
 
-				mockSummer := mocks.Summer{}
-				mockSummer.On("Sum", mock.MatchedBy(func(s string) bool {
-					return strings.HasSuffix(s, "Cargo.lock")
-				})).Return("12345", nil)
-
 				logger := scribe.NewEmitter(buffer)
 
-				build = cargo.Build(&mockRunner, &mockSummer, clock, logger)
+				build = cargo.Build(&mockRunner, clock, logger)
 			})
 
 			it("returns an error", func() {
