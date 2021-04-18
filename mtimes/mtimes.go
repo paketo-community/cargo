@@ -72,6 +72,10 @@ func (p Preserver) Restore(path string) error {
 	metadataPath := filepath.Join(path, PreserverMetadataFile)
 	fileIn, err := os.Open(metadataPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			p.Log.Action("File modification times not restored")
+			return nil
+		}
 		return fmt.Errorf("unable open metadata file %s\n%w", metadataPath, err)
 	}
 	defer fileIn.Close()

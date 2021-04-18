@@ -71,6 +71,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 	context("build cases", func() {
 		it("builds", func() {
+			Expect(os.MkdirAll(filepath.Join(layersDir, "rust-cargo"), 0755)).ToNot(HaveOccurred())
 			result, err := build(packit.BuildContext{
 				WorkingDir: workingDir,
 				Layers:     packit.Layers{Path: layersDir},
