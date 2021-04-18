@@ -3,6 +3,7 @@ package cargo
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -33,7 +34,8 @@ func NewCLIRunner(exec Executable) CLIRunner {
 // Install will build and install a project using `cargo install`
 func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer packit.Layer) error {
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("CARGO_TARGET_DIR=%s", workLayer.Path))
+	env = append(env, fmt.Sprintf("CARGO_TARGET_DIR=%s", path.Join(workLayer.Path, "target")))
+	env = append(env, fmt.Sprintf("CARGO_HOME=%s", path.Join(workLayer.Path, "home")))
 
 	for i := 0; i < len(env); i++ {
 		if strings.HasPrefix(env[i], "PATH=") {
@@ -56,6 +58,69 @@ func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer pack
 	if err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
+
+	err = c.CleanCargoHomeCache(workLayer)
+	if err != nil {
+		return fmt.Errorf("cleanup failed: %w", err)
+	}
+	return nil
+}
+
+func (c CLIRunner) CleanCargoHomeCache(workLayer packit.Layer) error {
+	homeDir := filepath.Join(workLayer.Path, "home")
+	files, err := os.ReadDir(homeDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("unable to read directory\n%w", err)
+	}
+
+	for _, file := range files {
+		if file.IsDir() && file.Name() == "bin" ||
+			file.IsDir() && file.Name() == "registry" ||
+			file.IsDir() && file.Name() == "git" {
+			continue
+		}
+		err := os.RemoveAll(filepath.Join(homeDir, file.Name()))
+		if err != nil {
+			return fmt.Errorf("unable to remove files\n%w", err)
+		}
+	}
+
+	registryDir := filepath.Join(homeDir, "registry")
+	files, err = os.ReadDir(registryDir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("unable to read directory\n%w", err)
+	}
+
+	for _, file := range files {
+		if file.IsDir() && file.Name() == "index" ||
+			file.IsDir() && file.Name() == "cache" {
+			continue
+		}
+		err := os.RemoveAll(filepath.Join(registryDir, file.Name()))
+		if err != nil {
+			return fmt.Errorf("unable to remove files\n%w", err)
+		}
+	}
+
+	gitDir := filepath.Join(homeDir, "git")
+	files, err = os.ReadDir(gitDir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("unable to read directory\n%w", err)
+	}
+
+	for _, file := range files {
+		if file.IsDir() && file.Name() == "db" {
+			continue
+		}
+		err := os.RemoveAll(filepath.Join(gitDir, file.Name()))
+		if err != nil {
+			return fmt.Errorf("unable to remove files\n%w", err)
+		}
+	}
+
 	return nil
 }
 

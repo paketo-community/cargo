@@ -2,6 +2,7 @@ package cargo_test
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,7 +114,8 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 	context("when there is a valid Rust project", func() {
 		it("builds correctly with defaults", func() {
 			env := os.Environ()
-			env = append(env, `CARGO_TARGET_DIR=/some/location/1`)
+			env = append(env, `CARGO_TARGET_DIR=/some/location/1/target`)
+			env = append(env, `CARGO_HOME=/some/location/1/home`)
 
 			for i := 0; i < len(env); i++ {
 				if strings.HasPrefix(env[i], "PATH=") {
@@ -152,7 +154,8 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 
 			it("builds correctly with custom args", func() {
 				env := os.Environ()
-				env = append(env, `CARGO_TARGET_DIR=/some/location/1`)
+				env = append(env, `CARGO_TARGET_DIR=/some/location/1/target`)
+				env = append(env, `CARGO_HOME=/some/location/1/home`)
 
 				for i := 0; i < len(env); i++ {
 					if strings.HasPrefix(env[i], "PATH=") {
@@ -187,7 +190,8 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 	context("failure cases", func() {
 		it("bubbles up failures", func() {
 			env := os.Environ()
-			env = append(env, `CARGO_TARGET_DIR=/some/location/1`)
+			env = append(env, `CARGO_TARGET_DIR=/some/location/1/target`)
+			env = append(env, `CARGO_HOME=/some/location/1/home`)
 
 			for i := 0; i < len(env); i++ {
 				if strings.HasPrefix(env[i], "PATH=") {
@@ -214,6 +218,50 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			err := runner.Install(workingDir, workLayer, destLayer)
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(Equal("build failed: expected")))
+		})
+	})
+
+	context("when cargo home has files", func() {
+		it("is cleaned up", func() {
+			workingDir, err := ioutil.TempDir("", "working-dir")
+			Expect(err).NotTo(HaveOccurred())
+
+			// To keep
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "bin"), 0755)).ToNot(HaveOccurred())
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "registry", "index"), 0755)).ToNot(HaveOccurred())
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "registry", "cache"), 0755)).ToNot(HaveOccurred())
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "git", "db"), 0755)).ToNot(HaveOccurred())
+
+			// To destroy
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "registry", "foo"), 0755)).ToNot(HaveOccurred())
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "git", "bar"), 0755)).ToNot(HaveOccurred())
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "baz"), 0755)).ToNot(HaveOccurred())
+
+			err = cargo.NewCLIRunner(nil).CleanCargoHomeCache(packit.Layer{Name: "Cargo", Path: workingDir})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(filepath.Join(workingDir, "home", "bin")).To(BeADirectory())
+			Expect(filepath.Join(workingDir, "home", "registry", "index")).To(BeADirectory())
+			Expect(filepath.Join(workingDir, "home", "registry", "cache")).To(BeADirectory())
+			Expect(filepath.Join(workingDir, "home", "git", "db")).To(BeADirectory())
+			Expect(filepath.Join(workingDir, "home", "registry", "foo")).ToNot(BeADirectory())
+			Expect(filepath.Join(workingDir, "home", "git", "bar")).ToNot(BeADirectory())
+			Expect(filepath.Join(workingDir, "home", "baz")).ToNot(BeADirectory())
+		})
+
+		it("handles when registry and git are not present", func() {
+			workingDir, err := ioutil.TempDir("", "working-dir")
+			Expect(err).NotTo(HaveOccurred())
+
+			// To keep
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "bin"), 0755)).ToNot(HaveOccurred())
+
+			// To destroy
+			Expect(os.MkdirAll(filepath.Join(workingDir, "home", "baz"), 0755)).ToNot(HaveOccurred())
+
+			err = cargo.NewCLIRunner(nil).CleanCargoHomeCache(packit.Layer{Name: "Cargo", Path: workingDir})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(filepath.Join(workingDir, "home", "bin")).To(BeADirectory())
+			Expect(filepath.Join(workingDir, "home", "baz")).ToNot(BeADirectory())
 		})
 	})
 }

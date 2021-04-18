@@ -1,20 +1,13 @@
 package cargo
 
 import (
-	"path/filepath"
+	"github.com/dmikusa/rust-cargo-cnb/mtimes"
 	"time"
 
 	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/chronos"
 	"github.com/paketo-buildpacks/packit/scribe"
 )
-
-//go:generate mockery --name Summer --case=underscore
-
-// Summer can make checksums of the item at the given path
-type Summer interface {
-	Sum(path ...string) (string, error)
-}
 
 //go:generate mockery --name Runner --case=underscore
 
@@ -24,7 +17,7 @@ type Runner interface {
 }
 
 // Build does the actual install of Rust
-func Build(runner Runner, summer Summer, clock chronos.Clock, logger scribe.Emitter) packit.BuildFunc {
+func Build(runner Runner, clock chronos.Clock, logger scribe.Emitter) packit.BuildFunc {
 	return func(context packit.BuildContext) (packit.BuildResult, error) {
 		logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 		logger.Process("Cargo is checking if your Rust project needs to be built")
@@ -34,7 +27,6 @@ func Build(runner Runner, summer Summer, clock chronos.Clock, logger scribe.Emit
 			return packit.BuildResult{}, err
 		}
 
-		cargoLayer.Build = true
 		cargoLayer.Cache = true
 
 		binaryLayer, err := context.Layers.Get("rust-bin")
@@ -44,35 +36,24 @@ func Build(runner Runner, summer Summer, clock chronos.Clock, logger scribe.Emit
 
 		binaryLayer.Launch = true
 
-		cargoLockHash, err := summer.Sum(filepath.Join(context.WorkingDir, "Cargo.lock"))
+		then := clock.Now()
+		preserver := mtimes.NewPreserver(logger)
+		preserver.Restore(cargoLayer.Path)
+		err = runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
+		preserver.Preserve(cargoLayer.Path)
 
-		if sha, ok := cargoLayer.Metadata["cache_sha"].(string); !ok || sha != cargoLockHash {
-			logger.Subprocess("Project needs to be built")
-			logger.Break()
+		logger.Action("Completed in %s", time.Since(then).Round(time.Millisecond))
+		logger.Break()
 
-			then := clock.Now()
-			err := runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
-			if err != nil {
-				return packit.BuildResult{}, err
-			}
+		cargoLayer.Metadata = map[string]interface{}{
+			"built_at": clock.Now().Format(time.RFC3339Nano),
+		}
 
-			logger.Action("Completed in %s", time.Since(then).Round(time.Millisecond))
-			logger.Break()
-
-			cargoLayer.Metadata = map[string]interface{}{
-				"built_at":  clock.Now().Format(time.RFC3339Nano),
-				"cache_sha": cargoLockHash,
-			}
-
-			binaryLayer.Metadata = map[string]interface{}{
-				"built_at": clock.Now().Format(time.RFC3339Nano),
-			}
-		} else {
-			logger.Subprocess("No change, reusing")
-			logger.Break()
+		binaryLayer.Metadata = map[string]interface{}{
+			"built_at": clock.Now().Format(time.RFC3339Nano),
 		}
 
 		return packit.BuildResult{
