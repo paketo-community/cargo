@@ -44,23 +44,23 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 		Expect(touch(filepath.Join(workDir, "testdata/foldera/folderb/folderc/filec1.txt"))).ToNot(HaveOccurred())
 
 		// modify the times to ensure an expected output from mtimes module (git does not preserver mtimes)
-		Expect(changeTime(filepath.Join(workDir, "testdata"), "2021-04-13T21:32:42.266625461-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1"), "2021-04-13T21:32:16.56220856-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/file1a.txt"), "2021-04-13T21:32:11.619000841-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/file1b.txt"), "2021-04-13T21:32:16.562185855-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2"), "2021-04-13T21:33:12.836115365-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/file2a.txt"), "2021-04-13T21:32:24.132-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/file2b.txt"), "2021-04-13T21:33:12.836100946-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/folder3"), "2021-04-13T21:33:24.454010729-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/folder3/file3a.txt"), "2021-04-13T21:33:21.115193516-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/folder3/file3b.txt"), "2021-04-17T22:39:03.01803-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/foldera"), "2021-04-13T21:31:49.712696151-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/filea1.txt"), "2021-04-13T21:31:44.719991295-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/filea2.txt"), "2021-04-13T21:31:49.712681414-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb"), "2021-04-13T21:31:36.645595542-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb/fileb1.txt"), "2021-04-13T21:31:36.645581261-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb/folderc"), "2021-04-13T21:31:27.300292894-04:00")).ToNot(HaveOccurred())
-		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb/folderc/filec1.txt"), "2021-04-13T21:31:27.30028183-04:00")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata"), "2021-04-13T21:32:42.266625461")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1"), "2021-04-13T21:32:16.56220856")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/file1a.txt"), "2021-04-13T21:32:11.619000841")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/file1b.txt"), "2021-04-13T21:32:16.562185855")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2"), "2021-04-13T21:33:12.836115365")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/file2a.txt"), "2021-04-13T21:32:24.132")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/file2b.txt"), "2021-04-13T21:33:12.836100946")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/folder3"), "2021-04-13T21:33:24.454010729")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/folder3/file3a.txt"), "2021-04-13T21:33:21.115193516")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/folder1/folder2/folder3/file3b.txt"), "2021-04-17T22:39:03.01803")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/foldera"), "2021-04-13T21:31:49.712696151")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/filea1.txt"), "2021-04-13T21:31:44.719991295")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/filea2.txt"), "2021-04-13T21:31:49.712681414")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb"), "2021-04-13T21:31:36.645595542")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb/fileb1.txt"), "2021-04-13T21:31:36.645581261")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb/folderc"), "2021-04-13T21:31:27.300292894")).ToNot(HaveOccurred())
+		Expect(changeTime(filepath.Join(workDir, "testdata/foldera/folderb/folderc/filec1.txt"), "2021-04-13T21:31:27.30028183")).ToNot(HaveOccurred())
 	})
 
 	it.After(func() {
@@ -72,7 +72,7 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 			logs := bytes.Buffer{}
 
 			// change one file's time on-the-fly to ensure we're getting accurate results
-			currentTime := time.Now().Local()
+			currentTime := time.Now().UTC()
 			checkTimePath := filepath.Join(workDir, "testdata/folder1/folder2/folder3/file3b.txt")
 			err := os.Chtimes(checkTimePath, currentTime, currentTime)
 			Expect(err).ToNot(HaveOccurred())
@@ -90,14 +90,14 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 			Expect(string(buf)).To(ContainSubstring("testdata/folder1/folder2/file2a.txt"))
 			Expect(string(buf)).To(ContainSubstring("testdata/foldera/folderb/folderc/filec1.txt"))
 			Expect(string(buf)).To(ContainSubstring(
-				fmt.Sprintf(`"MTime":"%s"`, currentTime.Format("2006-01-02T15:04:05.999999999-07:00"))))
+				fmt.Sprintf(`"MTime":"%s"`, currentTime.Format("2006-01-02T15:04:05.999999999Z"))))
 		})
 
 		it("restores the directory state", func() {
 			logs := bytes.Buffer{}
 
 			// wipe all the mtimes
-			originTime := time.Unix(0, 0)
+			originTime := time.Unix(0, 0).UTC()
 			Expect(filepath.WalkDir(filepath.Join(workDir, "testdata"), func(path string, d fs.DirEntry, err error) error {
 				Expect(err).ToNot(HaveOccurred())
 				err = os.Chtimes(path, originTime, originTime)
@@ -115,10 +115,10 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 
 			preserver := mtimes.NewPreserver(scribe.NewEmitter(&logs))
 			Expect(preserver.Restore(filepath.Join(workDir, "testdata"))).ToNot(HaveOccurred())
-			Expect(filepath.Join(workDir, "testdata/folder1")).To(HaveMTime("2021-04-13T21:32:16.56220856-04:00"))
-			Expect(filepath.Join(workDir, "testdata/folder1/file1a.txt")).To(HaveMTime("2021-04-13T21:32:11.619000841-04:00"))
-			Expect(filepath.Join(workDir, "testdata/folder1/folder2/folder3/file3a.txt")).To(HaveMTime("2021-04-13T21:33:21.115193516-04:00"))
-			Expect(filepath.Join(workDir, "testdata/foldera/folderb")).To(HaveMTime("2021-04-13T21:31:36.645595542-04:00"))
+			Expect(filepath.Join(workDir, "testdata/folder1")).To(HaveMTime("2021-04-13T21:32:16.56220856"))
+			Expect(filepath.Join(workDir, "testdata/folder1/file1a.txt")).To(HaveMTime("2021-04-13T21:32:11.619000841"))
+			Expect(filepath.Join(workDir, "testdata/folder1/folder2/folder3/file3a.txt")).To(HaveMTime("2021-04-13T21:33:21.115193516"))
+			Expect(filepath.Join(workDir, "testdata/foldera/folderb")).To(HaveMTime("2021-04-13T21:31:36.645595542"))
 		})
 	})
 }
@@ -128,13 +128,13 @@ func HaveMTime(expected interface{}) types.GomegaMatcher {
 	if !ok {
 		expectedTimeStr, ok := expected.(string)
 		if !ok {
-			panic(fmt.Errorf("unable to determine time, requires time.Time or string in format `2006-01-02T15:04:05.999999999-07:00`"))
+			panic(fmt.Errorf("unable to determine time, requires time.Time or string in format `2006-01-02T15:04:05.999999999` UTC"))
 		}
 
 		var err error
-		expectedTime, err = time.Parse("2006-01-02T15:04:05.999999999-07:00", expectedTimeStr)
+		expectedTime, err = time.Parse("2006-01-02T15:04:05.999999999", expectedTimeStr)
 		if err != nil {
-			panic(fmt.Errorf("unable to determine time, requires time.Time or string in format `2006-01-02T15:04:05.999999999-07:00`\n%w", err))
+			panic(fmt.Errorf("unable to determine time, requires time.Time or string in format `2006-01-02T15:04:05.999999999` UTC\n%w", err))
 		}
 	}
 	return &haveMTimeMatcher{expected: expectedTime}
@@ -155,7 +155,7 @@ func (matcher *haveMTimeMatcher) Match(actual interface{}) (success bool, err er
 	if err != nil {
 		return false, fmt.Errorf("unable to read file info %s\n%w", filePath, err)
 	}
-	matcher.actual = fileInfo.ModTime()
+	matcher.actual = fileInfo.ModTime().UTC()
 
 	return matcher.expected == matcher.actual, nil
 }
@@ -191,9 +191,9 @@ func touch(fileName string) error {
 }
 
 func changeTime(fileName string, toTime string) error {
-	bumpTime, err := time.Parse("2006-01-02T15:04:05.999999999-07:00", toTime)
+	bumpTime, err := time.Parse("2006-01-02T15:04:05.999999999", toTime)
 	if err != nil {
-		return fmt.Errorf("unable to parse time %s, use format `2006-01-02T15:04:05.999999999-07:00`\n%w", toTime, err)
+		return fmt.Errorf("unable to parse time %s, use format `2006-01-02T15:04:05.999999999` UTC\n%w", toTime, err)
 	}
 	err = os.Chtimes(fileName, bumpTime, bumpTime)
 	if err != nil {
