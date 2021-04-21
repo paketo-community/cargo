@@ -9,8 +9,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/dmikusa/rust-cargo-cnb/mtimes"
@@ -21,8 +21,9 @@ import (
 
 func testMTimes(t *testing.T, context spec.G, it spec.S) {
 	var (
-		Expect  = NewWithT(t).Expect
-		workDir string
+		Expect         = NewWithT(t).Expect
+		workDir        string
+		mtimesTemplate *template.Template
 	)
 
 	it.Before(func() {
@@ -30,6 +31,9 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 
 		workDir, err = ioutil.TempDir("", "mtimes-test")
 		Expect(err).NotTo(HaveOccurred())
+
+		mtimesTemplate, err = template.New("mtimes.json").ParseFiles("testdata/mtimes.json")
+		Expect(err).ToNot(HaveOccurred())
 
 		// set up expected files
 		Expect(touch(filepath.Join(workDir, "testdata/folder1/file1a.txt"))).ToNot(HaveOccurred())
@@ -107,10 +111,10 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 			Expect(filepath.Join(workDir, "testdata", "folder1")).To(HaveMTime(originTime))
 
 			// copy test mtimes.json file
-			data, err := ioutil.ReadFile("testdata/mtimes.json")
+			var b bytes.Buffer
+			err := mtimesTemplate.Execute(&b, map[string]string{"WorkDir": workDir})
 			Expect(err).ToNot(HaveOccurred())
-			data = []byte(strings.ReplaceAll(string(data), "##workdir##", workDir))
-			err = ioutil.WriteFile(filepath.Join(workDir, "testdata/mtimes.json"), data, 0644)
+			err = ioutil.WriteFile(filepath.Join(workDir, "testdata/mtimes.json"), b.Bytes(), 0644)
 			Expect(err).ToNot(HaveOccurred())
 
 			preserver := mtimes.NewPreserver(scribe.NewEmitter(&logs))
