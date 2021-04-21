@@ -49,7 +49,7 @@ func (p Preserver) Preserve(path string) error {
 			return fmt.Errorf("unable to read file\n%w", err)
 		}
 
-		err = jsonEncoder.Encode(Record{path, fileInfo.ModTime()})
+		err = jsonEncoder.Encode(Record{path, fileInfo.ModTime().UTC()})
 		if err != nil {
 			return fmt.Errorf("unable to encode mtime\n%w", err)
 		}
