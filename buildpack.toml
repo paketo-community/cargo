@@ -1,9 +1,13 @@
 api = "0.4"
 
 [buildpack]
+  homepage = "https://github.com/paketo-community/cargo-install"
   id = "paketo-community/cargo-install"
   name = "Rust Cargo Build Pack"
-  homepage = "https://github.com/paketo-community/cargo-install"
+
+[metadata]
+  include-files = ["bin/run", "bin/build", "bin/detect", "buildpack.toml"]
+  pre-package = "./scripts/build.sh"
 
 [[stacks]]
   id = "io.buildpacks.stacks.bionic"
@@ -13,7 +17,3 @@ api = "0.4"
 
 [[stacks]]
   id = "io.paketo.stacks.tiny"
-
-[metadata]
-  include-files = ["bin/run", "bin/build", "bin/detect", "buildpack.toml"]
-  pre-package = "./scripts/build.sh"
