@@ -34,6 +34,7 @@ func Detect() packit.DetectFunc {
 		}
 
 		if !cargoTomlFound || !cargoLockFound {
+			//lint:ignore ST1005 Reads nicer when displayed to end user with leading capital letter
 			return packit.DetectResult{}, fmt.Errorf("Missing [Cargo.toml: %v, Cargo.lock: %v], both required", !cargoTomlFound, !cargoLockFound)
 		}
 

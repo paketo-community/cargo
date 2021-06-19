@@ -1,7 +1,10 @@
 package cargo
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,6 +13,7 @@ import (
 	"github.com/mattn/go-shellwords"
 	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/pexec"
+	"github.com/paketo-buildpacks/packit/scribe"
 )
 
 //go:generate mockery --name Executable --case=underscore
@@ -21,18 +25,19 @@ type Executable interface {
 
 // CLIRunner can execute cargo via CLI
 type CLIRunner struct {
-	exec Executable
+	exec   Executable
+	logger scribe.Emitter
 }
 
 // NewCLIRunner creates a new Cargo Runner using the cargo cli
-func NewCLIRunner(exec Executable) CLIRunner {
+func NewCLIRunner(exec Executable, logger scribe.Emitter) CLIRunner {
 	return CLIRunner{
-		exec: exec,
+		exec:   exec,
+		logger: logger,
 	}
 }
 
-// Install will build and install a project using `cargo install`
-func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer packit.Layer) error {
+func createEnviron(workLayer packit.Layer, destLayer packit.Layer) []string {
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("CARGO_TARGET_DIR=%s", path.Join(workLayer.Path, "target")))
 	env = append(env, fmt.Sprintf("CARGO_HOME=%s", path.Join(workLayer.Path, "home")))
@@ -43,16 +48,27 @@ func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer pack
 		}
 	}
 
-	args, err := c.BuildArgs(destLayer)
+	return env
+}
+
+// Install will build and install the project using `cargo install`
+func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer packit.Layer) error {
+	return c.InstallMember(".", srcDir, workLayer, destLayer)
+}
+
+// InstallMember will build and install a specific workspace member using `cargo install`
+func (c CLIRunner) InstallMember(memberPath string, srcDir string, workLayer packit.Layer, destLayer packit.Layer) error {
+	args, err := c.BuildArgs(destLayer, memberPath)
 	if err != nil {
 		return err
 	}
 
+	c.logger.Detail("cargo %s", strings.Join(args, " "))
 	err = c.exec.Execute(pexec.Execution{
 		Dir:    srcDir,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		Env:    env,
+		Stdout: scribe.NewWriter(os.Stdout, scribe.WithIndent(5)),
+		Stderr: scribe.NewWriter(os.Stderr, scribe.WithIndent(5)),
+		Env:    createEnviron(workLayer, destLayer),
 		Args:   args,
 	})
 	if err != nil {
@@ -64,6 +80,55 @@ func (c CLIRunner) Install(srcDir string, workLayer packit.Layer, destLayer pack
 		return fmt.Errorf("cleanup failed: %w", err)
 	}
 	return nil
+}
+
+type metadata struct {
+	WorkspaceMembers []string `json:"workspace_members"`
+}
+
+// WorkspaceMembers loads the members from the project workspace
+func (c CLIRunner) WorkspaceMembers(srcDir string, workLayer packit.Layer, destLayer packit.Layer) ([]url.URL, error) {
+	stdout := bytes.Buffer{}
+
+	err := c.exec.Execute(pexec.Execution{
+		Dir:    srcDir,
+		Stdout: &stdout,
+		Env:    createEnviron(workLayer, destLayer),
+		Args:   []string{"metadata", "--format-version=1", "--no-deps"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build failed: %w", err)
+	}
+
+	var m metadata
+	err = json.Unmarshal(stdout.Bytes(), &m)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse Cargo metadata: %w", err)
+	}
+
+	filterStr, filter := os.LookupEnv("BP_CARGO_WORKSPACE_MEMBERS")
+	filterList := make(map[string]bool)
+	if filter {
+		for _, f := range strings.Split(filterStr, ",") {
+			filterList[strings.TrimSpace(f)] = true
+		}
+	}
+
+	var paths []url.URL
+	for _, workspace := range m.WorkspaceMembers {
+		// This is OK because the workspace member format is `package-name package-version (url)` and
+		//   none of name, version or URL may contain a space & be valid
+		parts := strings.SplitN(workspace, " ", 3)
+		if filter && filterList[strings.TrimSpace(parts[0])] || !filter {
+			path, err := url.Parse(strings.TrimSuffix(strings.TrimPrefix(parts[2], "("), ")"))
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse URL %s: %w", workspace, err)
+			}
+			paths = append(paths, *path)
+		}
+	}
+
+	return paths, nil
 }
 
 func (c CLIRunner) CleanCargoHomeCache(workLayer packit.Layer) error {
@@ -125,22 +190,22 @@ func (c CLIRunner) CleanCargoHomeCache(workLayer packit.Layer) error {
 }
 
 // BuildArgs will build the list of arguments to pass `cargo install`
-func (c CLIRunner) BuildArgs(destLayer packit.Layer) ([]string, error) {
-	env_args, err := c.FilterInstallArgs(os.Getenv("BP_CARGO_INSTALL_ARGS"))
+func (c CLIRunner) BuildArgs(destLayer packit.Layer, defaultMemberPath string) ([]string, error) {
+	envArgs, err := FilterInstallArgs(os.Getenv("BP_CARGO_INSTALL_ARGS"))
 	if err != nil {
 		return nil, fmt.Errorf("filter failed: %w", err)
 	}
 
 	args := []string{"install"}
-	args = append(args, env_args...)
+	args = append(args, envArgs...)
 	args = append(args, "--color=never", fmt.Sprintf("--root=%s", destLayer.Path))
-	args = c.AddDefaultPath(args)
+	args = AddDefaultPath(args, defaultMemberPath)
 
 	return args, nil
 }
 
-// FilterInstallArg provides a clean list of allowed arguments
-func (c CLIRunner) FilterInstallArgs(args string) ([]string, error) {
+// FilterInstallArgs provides a clean list of allowed arguments
+func FilterInstallArgs(args string) ([]string, error) {
 	argwords, err := shellwords.Parse(args)
 	if err != nil {
 		return nil, fmt.Errorf("parse args failed: %w", err)
@@ -167,11 +232,11 @@ func (c CLIRunner) FilterInstallArgs(args string) ([]string, error) {
 }
 
 // AddDefaultPath will add --path=. if --path is not set
-func (c CLIRunner) AddDefaultPath(args []string) []string {
+func AddDefaultPath(args []string, defaultMemberPath string) []string {
 	for _, arg := range args {
 		if arg == "--path" || strings.HasPrefix(arg, "--path=") {
 			return args
 		}
 	}
-	return append(args, "--path=.")
+	return append(args, fmt.Sprintf("--path=%s", defaultMemberPath))
 }
