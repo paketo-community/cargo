@@ -16,6 +16,7 @@ func main() {
 
 	packit.Run(
 		cargo.Detect(),
-		cargo.Build(cargo.NewCLIRunner(cargoExe), chronos.DefaultClock, logger),
-	)
+		cargo.Build(
+			cargo.NewCLIRunner(cargoExe, logger),
+			chronos.DefaultClock, logger))
 }

@@ -1,8 +1,13 @@
 package cargo
 
 import (
-	"github.com/dmikusa/rust-cargo-cnb/mtimes"
+	"fmt"
+	"net/url"
+	"os"
+	"strings"
 	"time"
+
+	"github.com/dmikusa/rust-cargo-cnb/mtimes"
 
 	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/chronos"
@@ -14,6 +19,8 @@ import (
 // Runner is something capable of running Cargo
 type Runner interface {
 	Install(srcDir string, workLayer packit.Layer, destLayer packit.Layer) error
+	InstallMember(memberPath string, srcDir string, workLayer packit.Layer, destLayer packit.Layer) error
+	WorkspaceMembers(srcDir string, workLayer packit.Layer, destLayer packit.Layer) ([]url.URL, error)
 }
 
 // Build does the actual install of Rust
@@ -44,9 +51,37 @@ func Build(runner Runner, clock chronos.Clock, logger scribe.Emitter) packit.Bui
 			return packit.BuildResult{}, err
 		}
 
-		err = runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
+		members, err := runner.WorkspaceMembers(context.WorkingDir, cargoLayer, binaryLayer)
 		if err != nil {
 			return packit.BuildResult{}, err
+		}
+
+		isPathSet, err := IsPathSet()
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
+		if len(members) == 0 {
+			logger.Subprocess("WARNING: no members detected, trying to install with no path. This may fail.")
+			// run `cargo install`
+			err = runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
+			if err != nil {
+				return packit.BuildResult{}, err
+			}
+		} else if (len(members) == 1 && members[0].Path == "/workspace") || isPathSet {
+			// run `cargo install`
+			err = runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
+			if err != nil {
+				return packit.BuildResult{}, err
+			}
+		} else { // if len(members) > 1 and --path not set
+			// run `cargo install --path=` for each member in the workspace
+			for _, member := range members {
+				err = runner.InstallMember(member.Path, context.WorkingDir, cargoLayer, binaryLayer)
+				if err != nil {
+					return packit.BuildResult{}, err
+				}
+			}
 		}
 
 		err = preserver.Preserve(cargoLayer.Path)
@@ -72,4 +107,19 @@ func Build(runner Runner, clock chronos.Clock, logger scribe.Emitter) packit.Bui
 			},
 		}, nil
 	}
+}
+
+func IsPathSet() (bool, error) {
+	envArgs, err := FilterInstallArgs(os.Getenv("BP_CARGO_INSTALL_ARGS"))
+	if err != nil {
+		return false, fmt.Errorf("filter failed: %w", err)
+	}
+
+	for _, arg := range envArgs {
+		if arg == "--path" || strings.HasPrefix(arg, "--path=") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
