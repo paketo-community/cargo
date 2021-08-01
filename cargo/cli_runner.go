@@ -97,7 +97,7 @@ func (c CLIRunner) WorkspaceMembers(srcDir string, workLayer packit.Layer, destL
 		Args:   []string{"metadata", "--format-version=1", "--no-deps"},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("build failed: %w", err)
+		return nil, fmt.Errorf("build failed: %s\n%w", &stdout, err)
 	}
 
 	var m metadata
