@@ -1,9 +1,15 @@
-api = "0.4"
+api = "0.5"
 
 [buildpack]
-  homepage = "https://github.com/paketo-community/cargo-install"
   id = "paketo-community/cargo-install"
   name = "Rust Cargo Build Pack"
+  homepage = "https://github.com/paketo-community/cargo-install"
+  description = "A Cloud Native Buildpack that builds Cargo-based Rust applications from source"
+  keywords    = ["cargo", "rust", "build-system"]
+
+[[buildpack.licenses]]
+  type = "Apache-2.0"
+  uri  = "https://github.com/paketo-community/cargo-install/blob/main/LICENSE"
 
 [metadata]
   include-files = ["bin/run", "bin/build", "bin/detect", "buildpack.toml"]
@@ -13,7 +19,7 @@ api = "0.4"
   id = "io.buildpacks.stacks.bionic"
 
 [[stacks]]
-  id = "org.cloudfoundry.stacks.cflinuxfs3"
+  id = "io.paketo.stacks.tiny"
 
 [[stacks]]
-  id = "io.paketo.stacks.tiny"
+  id = "*"
