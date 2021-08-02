@@ -1,59 +1,76 @@
+/*
+ * Copyright 2018-2020 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cargo
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/paketo-buildpacks/packit"
+	"github.com/buildpacks/libcnb"
 )
 
-// PlanDependencyRustCargo is the name of the plan
-const PlanDependencyRustCargo = "rust-cargo"
+const (
+	PlanEntryRustCargo = "rust-cargo"
+)
 
-// BuildPlanMetadata defines the information stored in the build plan
-type BuildPlanMetadata struct {
-	VersionSource string `toml:"version-source"`
-	Version       string `toml:"version"`
+type Detect struct {
 }
 
-// Detect if the Rust binaries should be delivered
-func Detect() packit.DetectFunc {
-	return func(context packit.DetectContext) (packit.DetectResult, error) {
-		_, err := os.Stat(filepath.Join(context.WorkingDir, "Cargo.toml"))
-		cargoTomlFound := err == nil
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return packit.DetectResult{}, err
-		}
+func (d Detect) Detect(context libcnb.DetectContext) (libcnb.DetectResult, error) {
+	found, err := d.cargoProject(context.Application.Path)
+	if err != nil {
+		return libcnb.DetectResult{}, fmt.Errorf("unable to detect cargo requirements\n%w", err)
+	}
 
-		_, err = os.Stat(filepath.Join(context.WorkingDir, "Cargo.lock"))
-		cargoLockFound := err == nil
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return packit.DetectResult{}, err
-		}
+	if !found {
+		return libcnb.DetectResult{Pass: false}, nil
+	}
 
-		if !cargoTomlFound || !cargoLockFound {
-			//lint:ignore ST1005 Reads nicer when displayed to end user with leading capital letter
-			return packit.DetectResult{}, packit.Fail.WithMessage(fmt.Sprintf("Missing [Cargo.toml: %v, Cargo.lock: %v], both required", !cargoTomlFound, !cargoLockFound))
-		}
-
-		return packit.DetectResult{
-			Plan: packit.BuildPlan{
-				Provides: []packit.BuildPlanProvision{
-					{Name: PlanDependencyRustCargo},
+	return libcnb.DetectResult{
+		Pass: true,
+		Plans: []libcnb.BuildPlan{
+			{
+				Provides: []libcnb.BuildPlanProvide{
+					{Name: PlanEntryRustCargo},
 				},
-				Requires: []packit.BuildPlanRequirement{
-					{Name: PlanDependencyRustCargo},
-					{
-						Name: "rust",
-						Metadata: BuildPlanMetadata{
-							Version:       "",
-							VersionSource: "CARGO",
-						},
-					},
+				Requires: []libcnb.BuildPlanRequire{
+					{Name: PlanEntryRustCargo},
+					{Name: "rust"},
 				},
 			},
-		}, nil
+		},
+	}, nil
+}
+
+func (d Detect) cargoProject(appDir string) (bool, error) {
+	_, err := os.Stat(filepath.Join(appDir, "Cargo.toml"))
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, fmt.Errorf("unable to determine if Cargo.toml exists\n%w", err)
 	}
+
+	_, err = os.Stat(filepath.Join(appDir, "Cargo.lock"))
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, fmt.Errorf("unable to determine if Cargo.lock exists\n%w", err)
+	}
+
+	return true, nil
 }

@@ -1,10 +1,24 @@
+/*
+ * Copyright 2018-2020 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package mtimes_test
 
 import (
 	"bytes"
 	"fmt"
-	"github.com/onsi/gomega/types"
-	"github.com/paketo-buildpacks/packit/scribe"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -13,7 +27,10 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/dmikusa/rust-cargo-cnb/mtimes"
+	"github.com/onsi/gomega/types"
+	"github.com/paketo-buildpacks/libpak/bard"
+	"github.com/paketo-community/cargo/mtimes"
+
 	"github.com/sclevine/spec"
 
 	. "github.com/onsi/gomega"
@@ -81,7 +98,7 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 			err := os.Chtimes(checkTimePath, currentTime, currentTime)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = mtimes.NewPreserver(scribe.NewEmitter(&logs)).Preserve(filepath.Join(workDir, "testdata"))
+			err = mtimes.NewPreserver(bard.NewLogger(&logs)).Preserve(filepath.Join(workDir, "testdata"))
 			Expect(err).ToNot(HaveOccurred())
 			mtimesFile := filepath.Join(workDir, "testdata/mtimes.json")
 			Expect(mtimesFile).To(BeARegularFile())
@@ -117,7 +134,7 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 			err = ioutil.WriteFile(filepath.Join(workDir, "testdata/mtimes.json"), b.Bytes(), 0644)
 			Expect(err).ToNot(HaveOccurred())
 
-			preserver := mtimes.NewPreserver(scribe.NewEmitter(&logs))
+			preserver := mtimes.NewPreserver(bard.NewLogger(&logs))
 			Expect(preserver.Restore(filepath.Join(workDir, "testdata"))).ToNot(HaveOccurred())
 			Expect(filepath.Join(workDir, "testdata/folder1")).To(HaveMTime("2021-04-13T21:32:16.56220856"))
 			Expect(filepath.Join(workDir, "testdata/folder1/file1a.txt")).To(HaveMTime("2021-04-13T21:32:11.619000841"))

@@ -1,125 +1,69 @@
+/*
+ * Copyright 2018-2020 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cargo
 
 import (
 	"fmt"
-	"net/url"
-	"os"
-	"strings"
-	"time"
 
-	"github.com/dmikusa/rust-cargo-cnb/mtimes"
-
-	"github.com/paketo-buildpacks/packit"
-	"github.com/paketo-buildpacks/packit/chronos"
-	"github.com/paketo-buildpacks/packit/scribe"
+	"github.com/buildpacks/libcnb"
+	"github.com/paketo-buildpacks/libpak"
+	"github.com/paketo-buildpacks/libpak/bard"
+	"github.com/paketo-buildpacks/libpak/effect"
 )
 
-//go:generate mockery --name Runner --case=underscore
-
-// Runner is something capable of running Cargo
-type Runner interface {
-	Install(srcDir string, workLayer packit.Layer, destLayer packit.Layer) error
-	InstallMember(memberPath string, srcDir string, workLayer packit.Layer, destLayer packit.Layer) error
-	WorkspaceMembers(srcDir string, workLayer packit.Layer, destLayer packit.Layer) ([]url.URL, error)
+type Build struct {
+	Logger bard.Logger
 }
 
-// Build does the actual install of Rust
-func Build(runner Runner, clock chronos.Clock, logger scribe.Emitter) packit.BuildFunc {
-	return func(context packit.BuildContext) (packit.BuildResult, error) {
-		logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
-		logger.Process("Cargo is checking if your Rust project needs to be built")
+func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
+	b.Logger.Title(context.Buildpack)
+	result := libcnb.NewBuildResult()
 
-		cargoLayer, err := context.Layers.Get("rust-cargo")
+	pr := libpak.PlanEntryResolver{Plan: context.Plan}
+
+	if _, ok, err := pr.Resolve(PlanEntryRustCargo); err != nil {
+		return libcnb.BuildResult{}, fmt.Errorf("unable to resolve Rust Cargo plan entry\n%w", err)
+	} else if ok {
+		cr, err := libpak.NewConfigurationResolver(context.Buildpack, &b.Logger)
 		if err != nil {
-			return packit.BuildResult{}, err
+			return libcnb.BuildResult{}, fmt.Errorf("unable to create configuration resolver\n%w", err)
 		}
 
-		cargoLayer.Cache = true
+		cache := Cache{
+			AppPath: context.Application.Path,
+			Logger:  b.Logger,
+		}
+		result.Layers = append(result.Layers, cache)
 
-		binaryLayer, err := context.Layers.Get("rust-bin")
+		cargoLayer, err := NewCargo(
+			map[string]interface{}{},
+			context.Application.Path,
+			nil,
+			cache,
+			NewCLIRunner(cr, effect.NewExecutor(), b.Logger),
+			cr)
 		if err != nil {
-			return packit.BuildResult{}, err
+			return libcnb.BuildResult{}, fmt.Errorf("unable to create cargo layer contributor\n%w", err)
 		}
 
-		binaryLayer.Launch = true
-
-		then := clock.Now()
-
-		preserver := mtimes.NewPreserver(logger)
-		err = preserver.Restore(cargoLayer.Path)
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-
-		members, err := runner.WorkspaceMembers(context.WorkingDir, cargoLayer, binaryLayer)
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-
-		isPathSet, err := IsPathSet()
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-
-		if len(members) == 0 {
-			logger.Subprocess("WARNING: no members detected, trying to install with no path. This may fail.")
-			// run `cargo install`
-			err = runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
-			if err != nil {
-				return packit.BuildResult{}, err
-			}
-		} else if (len(members) == 1 && members[0].Path == "/workspace") || isPathSet {
-			// run `cargo install`
-			err = runner.Install(context.WorkingDir, cargoLayer, binaryLayer)
-			if err != nil {
-				return packit.BuildResult{}, err
-			}
-		} else { // if len(members) > 1 and --path not set
-			// run `cargo install --path=` for each member in the workspace
-			for _, member := range members {
-				err = runner.InstallMember(member.Path, context.WorkingDir, cargoLayer, binaryLayer)
-				if err != nil {
-					return packit.BuildResult{}, err
-				}
-			}
-		}
-
-		err = preserver.Preserve(cargoLayer.Path)
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-
-		logger.Action("Completed in %s", time.Since(then).Round(time.Millisecond))
-		logger.Break()
-
-		cargoLayer.Metadata = map[string]interface{}{
-			"built_at": clock.Now().Format(time.RFC3339Nano),
-		}
-
-		binaryLayer.Metadata = map[string]interface{}{
-			"built_at": clock.Now().Format(time.RFC3339Nano),
-		}
-
-		return packit.BuildResult{
-			Layers: []packit.Layer{
-				cargoLayer,
-				binaryLayer,
-			},
-		}, nil
-	}
-}
-
-func IsPathSet() (bool, error) {
-	envArgs, err := FilterInstallArgs(os.Getenv("BP_CARGO_INSTALL_ARGS"))
-	if err != nil {
-		return false, fmt.Errorf("filter failed: %w", err)
+		result.Layers = append(result.Layers, cargoLayer)
+		// TODO: BOM support for Cargo
+		// result.BOM.Entries = append(result.BOM.Entries, cargoBOM)
 	}
 
-	for _, arg := range envArgs {
-		if arg == "--path" || strings.HasPrefix(arg, "--path=") {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return result, nil
 }

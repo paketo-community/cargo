@@ -1,22 +1,31 @@
+/*
+ * Copyright 2018-2020 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cargo_test
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/dmikusa/rust-cargo-cnb/cargo"
-	"github.com/dmikusa/rust-cargo-cnb/cargo/mocks"
-	"github.com/paketo-buildpacks/packit"
-	"github.com/paketo-buildpacks/packit/chronos"
-	"github.com/paketo-buildpacks/packit/scribe"
+	"github.com/buildpacks/libcnb"
+	"github.com/paketo-buildpacks/libpak/bard"
+	"github.com/paketo-community/cargo/cargo"
 	"github.com/sclevine/spec"
-	"github.com/stretchr/testify/mock"
 
 	. "github.com/onsi/gomega"
 )
@@ -25,336 +34,57 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect = NewWithT(t).Expect
 
-		workingDir string
-		layersDir  string
-		cnbPath    string
-		timestamp  string
-		buffer     *bytes.Buffer
-		mockRunner mocks.Runner
-		clock      chronos.Clock
-
-		build packit.BuildFunc
+		ctx        libcnb.BuildContext
+		cargoBuild cargo.Build
 	)
 
 	it.Before(func() {
 		var err error
-		workingDir, err = ioutil.TempDir("", "working-dir")
+
+		ctx.Application.Path, err = ioutil.TempDir("", "build-application")
 		Expect(err).NotTo(HaveOccurred())
 
-		layersDir, err = ioutil.TempDir("", "layers")
+		// ctx.Buildpack.Metadata = map[string]interface{}{
+		// 	"configurations": []map[string]interface{}{
+		// 		{"name": "BP_MAVEN_BUILD_ARGUMENTS", "default": "test-argument"},
+		// 	},
+		// }
+
+		ctx.Layers.Path, err = ioutil.TempDir("", "build-layers")
 		Expect(err).NotTo(HaveOccurred())
 
-		cnbPath, err = ioutil.TempDir("", "cnb-path")
-		Expect(err).NotTo(HaveOccurred())
-
-		now := time.Now()
-		clock = chronos.NewClock(func() time.Time { return now })
-		timestamp = now.Format(time.RFC3339Nano)
-		buffer = bytes.NewBuffer(nil)
-
-		mockRunner = mocks.Runner{}
-
-		logger := scribe.NewEmitter(buffer)
-
-		build = cargo.Build(&mockRunner, clock, logger)
+		cargoBuild = cargo.Build{
+			Logger: bard.NewLogger(&bytes.Buffer{}),
+		}
 	})
 
 	it.After(func() {
-		mockRunner.AssertExpectations(t)
-
-		Expect(os.RemoveAll(workingDir)).To(Succeed())
-		Expect(os.RemoveAll(layersDir)).To(Succeed())
-		Expect(os.RemoveAll(cnbPath)).To(Succeed())
+		Expect(os.RemoveAll(ctx.Application.Path)).To(Succeed())
+		Expect(os.RemoveAll(ctx.Layers.Path)).To(Succeed())
 	})
 
-	context("build cases", func() {
-		it("builds a single member", func() {
-			member, err := url.Parse("file:///workspace")
-			Expect(err).ToNot(HaveOccurred())
-			mockRunner.On(
-				"WorkspaceMembers",
-				workingDir,
-				mock.AnythingOfType("packit.Layer"),
-				mock.AnythingOfType("packit.Layer")).Return([]url.URL{*member}, nil)
+	it("does not contribute anything", func() {
+		result, err := cargoBuild.Build(ctx)
+		Expect(err).NotTo(HaveOccurred())
 
-			mockRunner.On(
-				"Install",
-				workingDir,
-				mock.AnythingOfType("packit.Layer"),
-				mock.AnythingOfType("packit.Layer")).Return(nil)
-
-			Expect(os.MkdirAll(filepath.Join(layersDir, "rust-cargo"), 0755)).ToNot(HaveOccurred())
-			result, err := build(packit.BuildContext{
-				WorkingDir: workingDir,
-				Layers:     packit.Layers{Path: layersDir},
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{
-						{Name: "rust"},
-					},
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(packit.BuildResult{
-				Layers: []packit.Layer{
-					{
-						Name:             "rust-cargo",
-						Path:             filepath.Join(layersDir, "rust-cargo"),
-						Build:            false,
-						Cache:            true,
-						Launch:           false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at": timestamp,
-						},
-					},
-					{
-						Name:             "rust-bin",
-						Path:             filepath.Join(layersDir, "rust-bin"),
-						Build:            false,
-						Launch:           true,
-						Cache:            false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at": timestamp,
-						},
-					},
-				},
-			}))
-		})
-
-		it("builds a multi-member project", func() {
-			member1, err := url.Parse("file:///workspace1")
-			Expect(err).ToNot(HaveOccurred())
-			member2, err := url.Parse("file:///workspace2")
-			Expect(err).ToNot(HaveOccurred())
-
-			mockRunner.On(
-				"WorkspaceMembers",
-				workingDir,
-				mock.AnythingOfType("packit.Layer"),
-				mock.AnythingOfType("packit.Layer")).Return([]url.URL{*member1, *member2}, nil)
-
-			mockRunner.On(
-				"InstallMember",
-				member1.Path,
-				workingDir,
-				mock.AnythingOfType("packit.Layer"),
-				mock.AnythingOfType("packit.Layer")).Return(nil)
-
-			mockRunner.On(
-				"InstallMember",
-				member2.Path,
-				workingDir,
-				mock.AnythingOfType("packit.Layer"),
-				mock.AnythingOfType("packit.Layer")).Return(nil)
-
-			Expect(os.MkdirAll(filepath.Join(layersDir, "rust-cargo"), 0755)).ToNot(HaveOccurred())
-			result, err := build(packit.BuildContext{
-				WorkingDir: workingDir,
-				Layers:     packit.Layers{Path: layersDir},
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{
-						{Name: "rust"},
-					},
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(packit.BuildResult{
-				Layers: []packit.Layer{
-					{
-						Name:             "rust-cargo",
-						Path:             filepath.Join(layersDir, "rust-cargo"),
-						Build:            false,
-						Cache:            true,
-						Launch:           false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at": timestamp,
-						},
-					},
-					{
-						Name:             "rust-bin",
-						Path:             filepath.Join(layersDir, "rust-bin"),
-						Build:            false,
-						Launch:           true,
-						Cache:            false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at": timestamp,
-						},
-					},
-				},
-			}))
-		})
-
-		it("builds a multi-member project with single member after filter", func() {
-			member1, err := url.Parse("file:///workspace1")
-			Expect(err).ToNot(HaveOccurred())
-
-			// this filters down to one member
-			mockRunner.On(
-				"WorkspaceMembers",
-				workingDir,
-				mock.AnythingOfType("packit.Layer"),
-				mock.AnythingOfType("packit.Layer")).Return([]url.URL{*member1}, nil)
-
-			mockRunner.On(
-				"InstallMember",
-				member1.Path,
-				workingDir,
-				mock.AnythingOfType("packit.Layer"),
-				mock.AnythingOfType("packit.Layer")).Return(nil)
-
-			Expect(os.MkdirAll(filepath.Join(layersDir, "rust-cargo"), 0755)).ToNot(HaveOccurred())
-			result, err := build(packit.BuildContext{
-				WorkingDir: workingDir,
-				Layers:     packit.Layers{Path: layersDir},
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{
-						{Name: "rust"},
-					},
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(packit.BuildResult{
-				Layers: []packit.Layer{
-					{
-						Name:             "rust-cargo",
-						Path:             filepath.Join(layersDir, "rust-cargo"),
-						Build:            false,
-						Cache:            true,
-						Launch:           false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at": timestamp,
-						},
-					},
-					{
-						Name:             "rust-bin",
-						Path:             filepath.Join(layersDir, "rust-bin"),
-						Build:            false,
-						Launch:           true,
-						Cache:            false,
-						SharedEnv:        packit.Environment{},
-						BuildEnv:         packit.Environment{},
-						LaunchEnv:        packit.Environment{},
-						ProcessLaunchEnv: map[string]packit.Environment{},
-						Metadata: map[string]interface{}{
-							"built_at": timestamp,
-						},
-					},
-				},
-			}))
-		})
+		Expect(result.Layers).To(HaveLen(0))
 	})
 
-	context("failure cases", func() {
-		context("when the rust layer cannot be retrieved", func() {
-			it.Before(func() {
-				Expect(ioutil.WriteFile(filepath.Join(layersDir, "rust-cargo.toml"), nil, 0000)).To(Succeed())
-			})
+	it("contributes cargo layer", func() {
+		ctx.Plan.Entries = append(ctx.Plan.Entries, libcnb.BuildpackPlanEntry{Name: "rust-cargo"})
 
-			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					Layers:     packit.Layers{Path: layersDir},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{Name: "rust"},
-						},
-					},
-				})
-				Expect(err).To(MatchError(ContainSubstring("permission denied")))
-			})
-		})
+		result, err := cargoBuild.Build(ctx)
+		Expect(err).NotTo(HaveOccurred())
 
-		context("cargo build fails", func() {
-			it.Before(func() {
-				mockRunner := mocks.Runner{}
-				mockRunner.On(
-					"Install",
-					workingDir,
-					mock.AnythingOfType("packit.Layer"),
-					mock.AnythingOfType("packit.Layer"),
-				).Return(fmt.Errorf("expected"))
+		Expect(result.Layers).To(HaveLen(2))
+		Expect(result.Layers[0].Name()).To(Equal("Cargo Cache"))
+		Expect(result.Layers[1].Name()).To(Equal("Cargo"))
 
-				member, err := url.Parse("file:///workspace")
-				Expect(err).ToNot(HaveOccurred())
-				mockRunner.On(
-					"WorkspaceMembers",
-					workingDir,
-					mock.AnythingOfType("packit.Layer"),
-					mock.AnythingOfType("packit.Layer")).Return([]url.URL{*member}, nil)
-
-				logger := scribe.NewEmitter(buffer)
-
-				build = cargo.Build(&mockRunner, clock, logger)
-			})
-
-			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					Layers:     packit.Layers{Path: layersDir},
-					CNBPath:    cnbPath,
-					Stack:      "some-stack",
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{Name: "rust"},
-						},
-					},
-				})
-				Expect(err).To(MatchError("expected"))
-			})
-		})
-
-		context("cargo cannot fetch members", func() {
-			it.Before(func() {
-				mockRunner := mocks.Runner{}
-
-				mockRunner.On(
-					"WorkspaceMembers",
-					workingDir,
-					mock.AnythingOfType("packit.Layer"),
-					mock.AnythingOfType("packit.Layer")).Return(nil, fmt.Errorf("broken"))
-
-				logger := scribe.NewEmitter(buffer)
-
-				build = cargo.Build(&mockRunner, clock, logger)
-			})
-
-			it.After(func() {
-				mockRunner.AssertExpectations(t)
-			})
-
-			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					Layers:     packit.Layers{Path: layersDir},
-					CNBPath:    cnbPath,
-					Stack:      "some-stack",
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{Name: "rust"},
-						},
-					},
-				})
-				Expect(err).To(MatchError("broken"))
-			})
-		})
+		// TODO: BOM support isn't in yet
+		// Expect(result.BOM.Entries).To(HaveLen(1))
+		// Expect(result.BOM.Entries[0].Name).To(Equal("cargo"))
+		// Expect(result.BOM.Entries[0].Build).To(BeTrue())
+		// Expect(result.BOM.Entries[0].Launch).To(BeFalse())
 	})
+
 }

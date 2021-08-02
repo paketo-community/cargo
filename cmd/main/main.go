@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 the original author or authors.
+ * Copyright 2018-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-package cargo_test
+package main
 
 import (
-	"testing"
+	"os"
 
-	"github.com/sclevine/spec"
-	"github.com/sclevine/spec/report"
+	"github.com/buildpacks/libcnb"
+	"github.com/paketo-buildpacks/libpak/bard"
+	"github.com/paketo-community/cargo/cargo"
 )
 
-func TestUnitRustCargo(t *testing.T) {
-	suite := spec.New("Rust Cargo", spec.Report(report.Terminal{}))
-	suite("Build", testBuild)
-	suite("Detect", testDetect)
-	suite("Cargo", testCargo)
-	suite("Cache", testCache)
-	suite("CLI Runner", testCLIRunner)
-	suite.Run(t)
+func main() {
+	libcnb.Main(
+		cargo.Detect{},
+		cargo.Build{Logger: bard.NewLogger(os.Stdout)},
+	)
 }
