@@ -204,8 +204,7 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			}
 			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
 				return reflect.DeepEqual(ex.Args, expectedArgs) &&
-					ex.Dir == workingDir &&
-					reflect.TypeOf(ex.Stdout) == reflect.TypeOf(logger.InfoWriter())
+					ex.Dir == workingDir
 			})).Return(nil)
 
 			runner := cargo.NewCLIRunner(
@@ -244,8 +243,7 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 				}
 				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
 					return reflect.DeepEqual(ex.Args, expectedArgs) &&
-						ex.Dir == workingDir &&
-						reflect.TypeOf(ex.Stdout) == reflect.TypeOf(logger.InfoWriter())
+						ex.Dir == workingDir
 				})).Return(nil)
 
 				runner := cargo.NewCLIRunner(
@@ -374,8 +372,7 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			}
 			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
 				return reflect.DeepEqual(ex.Args, expectedArgs) &&
-					ex.Dir == workingDir &&
-					reflect.TypeOf(ex.Stdout) == reflect.TypeOf(logger.InfoWriter())
+					ex.Dir == workingDir
 			})).Return(fmt.Errorf("expected"))
 
 			runner := cargo.NewCLIRunner(
