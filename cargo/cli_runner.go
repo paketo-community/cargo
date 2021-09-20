@@ -65,8 +65,8 @@ func (c CLIRunner) InstallMember(memberPath string, srcDir string, destLayer lib
 		Command: "cargo",
 		Args:    args,
 		Dir:     srcDir,
-		Stdout:  c.Logger.InfoWriter(),
-		Stderr:  c.Logger.InfoWriter(),
+		Stdout:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
+		Stderr:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
 	}); err != nil {
 		return fmt.Errorf("unable to build\n%w", err)
 	}
