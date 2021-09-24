@@ -1,8 +1,8 @@
 # `gcr.io/paketo-community/cargo`
 
-The Rust Cargo Buildpack is a Cloud Native Buildpack that build Rust applications using Cargo.
+The Rust Cargo Buildpack is a Cloud Native Buildpack that builds Rust applications using Cargo.
 
-This buildpack is designed to work in collaboration with the [Rust Dist CNB](https://github.com/paketo-community/rust-dist) or [Rustup CNB](https://github.com/paketo-community/rustup) buildpacks which provides the actual Rust and Cargo binaries used by this buildpack.
+This buildpack is designed to work in collaboration with the [Rust Dist CNB](https://github.com/paketo-community/rust-dist) or [Rustup CNB](https://github.com/paketo-community/rustup) buildpacks which provide the actual Rust and Cargo binaries used by this buildpack.
 
 ## Behavior
 
@@ -29,7 +29,7 @@ The buildpack will do the following:
 | `$BP_CARGO_INSTALL_ARGS`      | Additional arguments for `cargo install`. By default, the buildpack will run `cargo install --color=never --root=<destination layer> --path=<path-to-member>` for each workspace member. See more details below.                                                                                                                                                       |
 | `$BP_CARGO_WORKSPACE_MEMBERS` | A comma delimited list of the workspace package names (this is the package name in the member's `Cargo.toml`, not what is in the workspace's `Cargo.toml`'s member list) to install. If the project is not using workspaces, this is not used. By default, for projects with a workspace, the buildpack will build all members in a workspace. See more details below. |
 
-### BP_CARGO_INSTALL_ARGS
+### `BP_CARGO_INSTALL_ARGS`
 
 Additional arguments for `cargo install`. Any additional arguments specified, are specified for each invocation of `cargo install`. The buildpack will execute `cargo install` once for each workspace member. If you're not using a workspace, then it executes a single time.
 
@@ -45,7 +45,7 @@ A few examples of what you can specify:
 
 You may **not** set `--color` and you may not set `--root`. These are fixed by the buildpack in order to make output look correct and to ensure that binaries are installed into the proper location.
 
-### BP_CARGO_WORKSPACE_MEMBERS
+### `BP_CARGO_WORKSPACE_MEMBERS`
 
 This option may be used in conjunction with `BP_CARGO_INSTALL_ARGS`, however you may not set `--path` in `BP_CARGO_INSTALL_ARGS` when also setting `BP_CARGO_WORKSPACE_MEMBERS`, as the buildpack will control `--path` when building workspace members.
 
@@ -63,6 +63,7 @@ In general, [you probably want the rust CNB instead](https://github.com/paketo-c
 If you want to use this particular CNB directly, the easiest way is via image. Run `pack build -b paketo-community/cargo:<version> ...`.
 
 ## License
+
 This buildpack is released under version 2.0 of the [Apache License][a].
 
 [a]: http://www.apache.org/licenses/LICENSE-2.0
