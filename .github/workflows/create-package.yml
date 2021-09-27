@@ -150,7 +150,7 @@ jobs:
                     --format "${FORMAT}"
                 fi
               env:
-                PACKAGE: docker.io/paketocommunity/rust-dist
+                PACKAGE: docker.io/paketocommunity/cargo
                 PUBLISH: "true"
                 VERSION: ${{ steps.version.outputs.version }}
             - name: Update release with digest
@@ -178,7 +178,7 @@ jobs:
             - if: ${{ true }}
               uses: docker://ghcr.io/buildpacks/actions/registry/request-add-entry:4.0.1
               with:
-                address: docker.io/paketocommunity/rust-dist@${{ steps.package.outputs.digest }}
+                address: docker.io/paketocommunity/cargo@${{ steps.package.outputs.digest }}
                 id: paketo-community/cargo
                 token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
                 version: ${{ steps.version.outputs.version }}

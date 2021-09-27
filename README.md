@@ -1,4 +1,4 @@
-# `gcr.io/paketo-community/cargo`
+# `docker.io/paketocommunity/cargo`
 
 The Rust Cargo Buildpack is a Cloud Native Buildpack that builds Rust applications using Cargo.
 
