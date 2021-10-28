@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package cargo_test
+package runner_test
 
 import (
 	"testing"
@@ -23,11 +23,8 @@ import (
 	"github.com/sclevine/spec/report"
 )
 
-func TestUnitRustCargo(t *testing.T) {
-	suite := spec.New("Rust Cargo", spec.Report(report.Terminal{}))
-	suite("Build", testBuild)
-	suite("Detect", testDetect)
-	suite("Cargo", testCargo)
-	suite("Cache", testCache)
+func TestUnitRunner(t *testing.T) {
+	suite := spec.New("Runners", spec.Report(report.Terminal{}))
+	suite("Runner", testRunners)
 	suite.Run(t)
 }

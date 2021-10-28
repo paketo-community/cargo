@@ -23,10 +23,12 @@ import (
 	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/effect"
+	"github.com/paketo-community/cargo/runner"
 )
 
 type Build struct {
-	Logger bard.Logger
+	CargoService runner.CargoService
+	Logger       bard.Logger
 }
 
 func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
@@ -43,6 +45,24 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create configuration resolver\n%w", err)
 		}
 
+		cargoHome, found := cr.Resolve("CARGO_HOME")
+		if !found {
+			return libcnb.BuildResult{}, fmt.Errorf("unable to locate cargo home")
+		}
+
+		cargoWorkspaceMembers, _ := cr.Resolve("BP_CARGO_WORKSPACE_MEMBERS")
+		cargoInstallArgs, _ := cr.Resolve("BP_CARGO_INSTALL_ARGS")
+
+		service := b.CargoService
+		if service == nil {
+			service = runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithCargoWorkspaceMembers(cargoWorkspaceMembers),
+				runner.WithCargoInstallArgs(cargoInstallArgs),
+				runner.WithExecutor(effect.NewExecutor()),
+				runner.WithLogger(b.Logger))
+		}
+
 		cache := Cache{
 			AppPath: context.Application.Path,
 			Logger:  b.Logger,
@@ -50,14 +70,18 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 		result.Layers = append(result.Layers, cache)
 
 		cargoLayer, err := NewCargo(
-			map[string]interface{}{},
-			context.Application.Path,
-			nil,
-			cache,
-			NewCLIRunner(cr, effect.NewExecutor(), b.Logger),
-			cr)
+			WithInstallArgs(cargoInstallArgs),
+			WithWorkspaceMembers(cargoWorkspaceMembers),
+			WithApplicationPath(context.Application.Path),
+			WithLogger(b.Logger),
+			WithCargoService(service))
 		if err != nil {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create cargo layer contributor\n%w", err)
+		}
+
+		result.Processes, err = cargoLayer.BuildProcessTypes()
+		if err != nil {
+			return libcnb.BuildResult{}, fmt.Errorf("unable to build list of process types\n%w", err)
 		}
 
 		result.Layers = append(result.Layers, cargoLayer)
