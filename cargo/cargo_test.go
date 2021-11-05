@@ -17,20 +17,18 @@
 package cargo_test
 
 import (
-	"fmt"
+	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/buildpacks/libcnb"
 	. "github.com/onsi/gomega"
-	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
-	"github.com/paketo-buildpacks/libpak/effect"
-	"github.com/paketo-buildpacks/libpak/effect/mocks"
 	"github.com/paketo-community/cargo/cargo"
+	"github.com/paketo-community/cargo/runner/mocks"
 	"github.com/sclevine/spec"
 	"github.com/stretchr/testify/mock"
 )
@@ -40,8 +38,9 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 		Expect = NewWithT(t).Expect
 
 		ctx       libcnb.BuildContext
-		executor  *mocks.Executor
+		service   *mocks.CargoService
 		cargoHome string
+		logger    bard.Logger
 	)
 
 	it.Before(func() {
@@ -57,7 +56,9 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.Setenv("CARGO_HOME", cargoHome)).ToNot(HaveOccurred())
 
-		executor = &mocks.Executor{}
+		logger = bard.NewLogger(io.Discard)
+
+		service = &mocks.CargoService{}
 	})
 
 	it.After(func() {
@@ -69,63 +70,30 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 	context("contribution scenarios", func() {
 		var (
-			logger  bard.Logger
-			cr      libpak.ConfigurationResolver
 			appFile string
 		)
 
 		it.Before(func() {
-			var err error
-
-			logger = bard.NewLogger(ioutil.Discard)
-			cr, err = libpak.NewConfigurationResolver(ctx.Buildpack, &logger)
-			Expect(err).ToNot(HaveOccurred())
-
-			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-				return reflect.DeepEqual(ex.Args,
-					[]string{"version"}) &&
-					ex.Command == "cargo"
-			})).Return(func(ex effect.Execution) error {
-				_, err := ex.Stdout.Write([]byte("cargo 1.2.3 (4369396ce 2021-04-27)\n"))
-				return err
-			})
-
-			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-				return reflect.DeepEqual(ex.Args,
-					[]string{"--version"}) &&
-					ex.Command == "rustc"
-			})).Return(func(ex effect.Execution) error {
-				_, err := ex.Stdout.Write([]byte("rustc 1.2.3 (4369396ce 2021-04-27)\n"))
-				return err
-			})
+			service.On("CargoVersion").Return("1.2.3", nil)
+			service.On("RustVersion").Return("1.2.3", nil)
 
 			appFile = filepath.Join(ctx.Application.Path, "main.rs")
 			Expect(ioutil.WriteFile(appFile, []byte{}, 0644)).To(Succeed())
 		})
 
 		context("validate metadata", func() {
-			it.Before(func() {
-				Expect(os.Setenv("BP_CARGO_INSTALL_ARGS", "--path=./todo --foo=bar --foo baz")).To(Succeed())
-				Expect(os.Setenv("BP_CARGO_WORKSPACE_MEMBERS", "foo, bar")).To(Succeed())
-			})
-
-			it.After(func() {
-				Expect(os.Unsetenv("BP_CARGO_INSTALL_ARGS")).To(Succeed())
-				Expect(os.Unsetenv("BP_CARGO_WORKSPACE_MEMBERS")).To(Succeed())
-			})
-
 			it("additional metadata and arguments are reflected through", func() {
 				additionalMetadata := map[string]interface{}{
 					"test": "expected-val",
 				}
 
 				r, err := cargo.NewCargo(
-					additionalMetadata,
-					ctx.Application.Path,
-					nil,
-					cargo.Cache{AppPath: ctx.Application.Path, Logger: logger},
-					cargo.NewCLIRunner(cr, executor, logger),
-					cr)
+					cargo.WithAdditionalMetadata(additionalMetadata),
+					cargo.WithWorkspaceMembers("foo, bar"),
+					cargo.WithApplicationPath(ctx.Application.Path),
+					cargo.WithCargoService(service),
+					cargo.WithInstallArgs("--path=./todo --foo=bar --foo baz"))
+
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveLen(6))
@@ -140,10 +108,95 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 			})
 		})
 
+		context("process types", func() {
+			it("includes all binary targets as process types with first as default", func() {
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"foo", "bar", "baz"}, nil)
+
+				r, err := cargo.NewCargo(
+					cargo.WithApplicationPath(ctx.Application.Path),
+					cargo.WithCargoService(service))
+				Expect(err).ToNot(HaveOccurred())
+
+				procs, err := r.BuildProcessTypes()
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(procs).To(HaveLen(3))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "foo",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "foo"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   true,
+					}))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "bar",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "bar"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "baz",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "baz"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+			})
+
+			it("includes all binary targets as process types with web as default", func() {
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"foo", "bar", "web", "baz"}, nil)
+
+				r, err := cargo.NewCargo(
+					cargo.WithApplicationPath(ctx.Application.Path),
+					cargo.WithCargoService(service))
+				Expect(err).ToNot(HaveOccurred())
+
+				procs, err := r.BuildProcessTypes()
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(procs).To(HaveLen(4))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "foo",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "foo"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "bar",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "bar"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "web",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "web"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   true,
+					}))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "baz",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "baz"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+			})
+		})
+
 		context("cargo workspace members", func() {
 			var (
-				r          cargo.Cargo
-				layer      libcnb.Layer
+				c          cargo.Cargo
 				cacheLayer libcnb.Layer
 			)
 
@@ -156,288 +209,190 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				cacheLayer, err = cache.Contribute(cacheLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				r, err = cargo.NewCargo(
-					map[string]interface{}{},
-					ctx.Application.Path,
-					nil,
-					cache,
-					cargo.NewCLIRunner(cr, executor, logger),
-					cr)
-				Expect(err).ToNot(HaveOccurred())
+				c, err = cargo.NewCargo(
+					cargo.WithApplicationPath(ctx.Application.Path),
+					cargo.WithCargoService(service))
 
-				layer, err = ctx.Layers.Layer("cargo-layer")
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			it("contributes cargo layer with no members", func() {
-				var err error
-
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, []string{"metadata", "--format-version=1", "--no-deps"})
-				})).Return(func(ex effect.Execution) error {
-					_, err := ex.Stdout.Write([]byte(BuildMetadata(ctx.Application.Path, []string{})))
-					Expect(err).ToNot(HaveOccurred())
-					return nil
-				})
-
-				expectedArgs := []string{"install", "--color=never", fmt.Sprintf("--root=%s", layer.Path), "--path=."}
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, expectedArgs) &&
-						ex.Command == "cargo"
-				})).Return(func(ex effect.Execution) error {
+				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{}, nil)
+				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
 					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"my-binary"}, nil)
 
-				layer, err = r.Contribute(layer)
+				inputLayer, err := ctx.Layers.Layer("cargo-layer")
+				Expect(err).ToNot(HaveOccurred())
+
+				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(layer.LayerTypes.Cache).To(BeTrue())
-				Expect(layer.LayerTypes.Build).To(BeFalse())
-				Expect(layer.LayerTypes.Launch).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
+				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
 
 				// app files should be deleted
 				Expect(appFile).ToNot(BeAnExistingFile())
 
 				// preserver should have run
-				Expect(filepath.Join(layer.Path, "mtimes.json")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "mtimes.json")).To(BeARegularFile())
 				Expect(filepath.Join(cargoHome, "mtimes.json")).To(BeARegularFile())
 				Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).To(BeARegularFile())
 
 				// we should have two copies of the binary, one in the layer an one in the app root
-				Expect(filepath.Join(layer.Path, "bin", "my-binary")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
-
-				executor := executor.Calls[3].Arguments[0].(effect.Execution)
-				Expect(executor.Command).To(Equal("cargo"))
-				Expect(executor.Args).To(Equal(expectedArgs))
 			})
 
 			it("contributes cargo layer with one member", func() {
-				var err error
+				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{
+					{Scheme: "file", Path: filepath.Join(ctx.Application.Path)},
+				}, nil)
 
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, []string{"metadata", "--format-version=1", "--no-deps"})
-				})).Return(func(ex effect.Execution) error {
-					_, err := ex.Stdout.Write([]byte(
-						BuildMetadata(ctx.Application.Path,
-							[]string{fmt.Sprintf("basics 2.0.0 (path+file://%s)", ctx.Application.Path)})))
-					Expect(err).ToNot(HaveOccurred())
-					return nil
-				})
-
-				expectedArgs := []string{"install", "--color=never", fmt.Sprintf("--root=%s", layer.Path), "--path=."}
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, expectedArgs) &&
-						ex.Command == "cargo"
-				})).Return(func(ex effect.Execution) error {
+				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
 					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
 
-				layer, err = r.Contribute(layer)
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"my-binary", "other"}, nil)
+
+				inputLayer, err := ctx.Layers.Layer("cargo-layer")
+				Expect(err).ToNot(HaveOccurred())
+
+				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(layer.LayerTypes.Cache).To(BeTrue())
-				Expect(layer.LayerTypes.Build).To(BeFalse())
-				Expect(layer.LayerTypes.Launch).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
+				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
 
 				// app files should be deleted
 				Expect(appFile).ToNot(BeAnExistingFile())
 
 				// preserver should have run
-				Expect(filepath.Join(layer.Path, "mtimes.json")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "mtimes.json")).To(BeARegularFile())
 				Expect(filepath.Join(cargoHome, "mtimes.json")).To(BeARegularFile())
 				Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).To(BeARegularFile())
 
 				// we should have two copies of the binary, one in the layer an one in the app root
-				Expect(filepath.Join(layer.Path, "bin", "my-binary")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
-
-				executor := executor.Calls[3].Arguments[0].(effect.Execution)
-				Expect(executor.Command).To(Equal("cargo"))
-				Expect(executor.Args).To(Equal(expectedArgs))
 			})
 
 			context("--path is set", func() {
-				it.Before(func() {
-					Expect(os.Setenv("BP_CARGO_INSTALL_ARGS", "--path=./todo")).ToNot(HaveOccurred())
-				})
-
-				it.After(func() {
-					Expect(os.Unsetenv("BP_CARGO_INSTALL_ARGS")).To(Succeed())
-				})
-
 				it("contributes cargo layer with multiples member but --path set", func() {
-					var err error
+					service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{
+						{Scheme: "file", Path: filepath.Join(ctx.Application.Path, "basics")},
+						{Scheme: "file", Path: filepath.Join(ctx.Application.Path, "todo")},
+					}, nil)
 
-					executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-						return reflect.DeepEqual(ex.Args, []string{"metadata", "--format-version=1", "--no-deps"})
-					})).Return(func(ex effect.Execution) error {
-						_, err := ex.Stdout.Write([]byte(
-							BuildMetadata(ctx.Application.Path,
-								[]string{
-									fmt.Sprintf("basics 2.0.0 (path+file://%s/basics)", ctx.Application.Path),
-									fmt.Sprintf("todo 1.2.0 (path+file://%s/todo)", ctx.Application.Path),
-								})))
-						Expect(err).ToNot(HaveOccurred())
-						return nil
-					})
+					// include `--path`
+					c.InstallArgs = "--path=./todo"
 
-					expectedArgs := []string{"install", "--path=./todo", "--color=never", fmt.Sprintf("--root=%s", layer.Path)}
-					executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-						return reflect.DeepEqual(ex.Args, expectedArgs) &&
-							ex.Command == "cargo"
-					})).Return(func(ex effect.Execution) error {
+					service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 						Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
 						err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 						Expect(err).ToNot(HaveOccurred())
 						return nil
 					})
 
-					layer, err = r.Contribute(layer)
+					service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"my-binary"}, nil)
+
+					inputLayer, err := ctx.Layers.Layer("cargo-layer")
+					Expect(err).ToNot(HaveOccurred())
+
+					outputLayer, err := c.Contribute(inputLayer)
 					Expect(err).NotTo(HaveOccurred())
 
-					Expect(layer.LayerTypes.Cache).To(BeTrue())
-					Expect(layer.LayerTypes.Build).To(BeFalse())
-					Expect(layer.LayerTypes.Launch).To(BeFalse())
+					Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
+					Expect(outputLayer.LayerTypes.Build).To(BeFalse())
+					Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
 
 					// app files should be deleted
 					Expect(appFile).ToNot(BeAnExistingFile())
 
 					// preserver should have run
-					Expect(filepath.Join(layer.Path, "mtimes.json")).To(BeARegularFile())
+					Expect(filepath.Join(outputLayer.Path, "mtimes.json")).To(BeARegularFile())
 					Expect(filepath.Join(cargoHome, "mtimes.json")).To(BeARegularFile())
 					Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).To(BeARegularFile())
 
 					// we should have two copies of the binary, one in the layer an one in the app root
-					Expect(filepath.Join(layer.Path, "bin", "my-binary")).To(BeARegularFile())
+					Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
 					Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
 					Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
-
-					executor := executor.Calls[3].Arguments[0].(effect.Execution)
-					Expect(executor.Command).To(Equal("cargo"))
-					Expect(executor.Args).To(Equal(expectedArgs))
 				})
 			})
 
 			it("contributes cargo layer with multiple members", func() {
-				var err error
+				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{
+					{Scheme: "file", Path: filepath.Join(ctx.Application.Path, "basics")},
+					{Scheme: "file", Path: filepath.Join(ctx.Application.Path, "todo")},
+					{Scheme: "file", Path: filepath.Join(ctx.Application.Path, "hello")},
+				}, nil)
 
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, []string{"metadata", "--format-version=1", "--no-deps"})
-				})).Return(func(ex effect.Execution) error {
-					_, err := ex.Stdout.Write([]byte(
-						BuildMetadata(ctx.Application.Path,
-							[]string{
-								fmt.Sprintf("basics 2.0.0 (path+file://%s/basics)", ctx.Application.Path),
-								fmt.Sprintf("todo 2.0.0 (path+file://%s/todo)", ctx.Application.Path),
-								fmt.Sprintf("hello 2.0.0 (path+file://%s/hello)", ctx.Application.Path)},
-						)))
-					Expect(err).ToNot(HaveOccurred())
-					return nil
-				})
-
-				expectedArgsList := [3][]string{}
-
-				expectedArgsList[0] = []string{
-					"install",
-					"--color=never",
-					fmt.Sprintf("--root=%s", layer.Path),
-					fmt.Sprintf("--path=%s", filepath.Join(ctx.Application.Path, "basics")),
-				}
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, expectedArgsList[0]) &&
-						ex.Command == "cargo"
-				})).Return(func(ex effect.Execution) error {
+				service.On("InstallMember", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(memberPath string, srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "basics"), []byte("contents"), 0644)
+					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", filepath.Base(memberPath)), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
 
-				expectedArgsList[1] = []string{
-					"install",
-					"--color=never",
-					fmt.Sprintf("--root=%s", layer.Path),
-					fmt.Sprintf("--path=%s", filepath.Join(ctx.Application.Path, "todo")),
-				}
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, expectedArgsList[1]) &&
-						ex.Command == "cargo"
-				})).Return(func(ex effect.Execution) error {
-					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "todo"), []byte("contents"), 0644)
-					Expect(err).ToNot(HaveOccurred())
-					return nil
-				})
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"todo", "hello"}, nil)
 
-				expectedArgsList[2] = []string{
-					"install",
-					"--color=never",
-					fmt.Sprintf("--root=%s", layer.Path),
-					fmt.Sprintf("--path=%s", filepath.Join(ctx.Application.Path, "hello")),
-				}
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					return reflect.DeepEqual(ex.Args, expectedArgsList[2]) &&
-						ex.Command == "cargo"
-				})).Return(func(ex effect.Execution) error {
-					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "hello"), []byte("contents"), 0644)
-					Expect(err).ToNot(HaveOccurred())
-					return nil
-				})
+				inputLayer, err := ctx.Layers.Layer("cargo-layer")
+				Expect(err).ToNot(HaveOccurred())
 
-				layer, err = r.Contribute(layer)
+				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(layer.LayerTypes.Cache).To(BeTrue())
-				Expect(layer.LayerTypes.Build).To(BeFalse())
-				Expect(layer.LayerTypes.Launch).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
+				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
 
 				// app files should be deleted
 				Expect(appFile).ToNot(BeAnExistingFile())
 
 				// preserver should have run
-				Expect(filepath.Join(layer.Path, "mtimes.json")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "mtimes.json")).To(BeARegularFile())
 				Expect(filepath.Join(cargoHome, "mtimes.json")).To(BeARegularFile())
 				Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).To(BeARegularFile())
 
 				// we should have two copies of the binaries, one in the layer an one in the app root
-				Expect(filepath.Join(layer.Path, "bin", "basics")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "bin", "basics")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "bin", "basics")).To(BeARegularFile())
-				Expect(filepath.Join(layer.Path, "bin", "todo")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "bin", "todo")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "bin", "todo")).To(BeARegularFile())
-				Expect(filepath.Join(layer.Path, "bin", "hello")).To(BeARegularFile())
+				Expect(filepath.Join(outputLayer.Path, "bin", "hello")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "bin", "hello")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
 
-				for i := range expectedArgsList {
-					// executor.Calls[3] is the first `cargo install` command
-					executor := executor.Calls[3+i].Arguments[0].(effect.Execution)
-					Expect(executor.Command).To(Equal("cargo"))
-
-					Expect(executor.Args).To(Equal(expectedArgsList[i]))
-				}
+				// make sure InstallMember ran three times
+				service.AssertNumberOfCalls(t, "InstallMember", 3)
 			})
 
 			it("fails cause CARGO_HOME isn't set", func() {
 				Expect(os.Unsetenv("CARGO_HOME")).To(Succeed())
 
-				_, err := r.Contribute(layer)
+				inputLayer, err := ctx.Layers.Layer("cargo-layer")
+				Expect(err).ToNot(HaveOccurred())
+
+				_, err = c.Contribute(inputLayer)
 				Expect(err).To(MatchError(ContainSubstring("unable to find CARGO_HOME, it must be set")))
 
 				// app files should not be deleted
 				Expect(appFile).To(BeAnExistingFile())
 
 				// preserver should not have run
-				Expect(filepath.Join(layer.Path, "mtimes.json")).ToNot(BeARegularFile())
+				Expect(filepath.Join(inputLayer.Path, "mtimes.json")).ToNot(BeARegularFile())
 				Expect(filepath.Join(cargoHome, "mtimes.json")).ToNot(BeARegularFile())
 				Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).ToNot(BeARegularFile())
 			})
