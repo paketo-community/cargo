@@ -28,74 +28,122 @@ import (
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/sherpa"
 	"github.com/paketo-community/cargo/mtimes"
+	"github.com/paketo-community/cargo/runner"
 )
 
-type Cargo struct {
-	ApplicationPath  string
-	BOM              *libcnb.BOM
-	Cache            Cache
-	CLIRunner        CLIRunner
-	ConfigResolver   libpak.ConfigurationResolver
-	LayerContributor libpak.LayerContributor
-	Logger           bard.Logger
+// Option is a function for configuring a Cargo
+type Option func(cargo Cargo) Cargo
+
+// WithApplicationPath sets app path
+func WithApplicationPath(ap string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.ApplicationPath = ap
+		return cargo
+	}
 }
 
-func NewCargo(additionalMetadata map[string]interface{}, applicationPath string, bom *libcnb.BOM, cache Cache, cliRunner CLIRunner, configResolver libpak.ConfigurationResolver) (Cargo, error) {
-	cargo := Cargo{
-		ApplicationPath: applicationPath,
-		BOM:             bom,
-		Cache:           cache,
-		CLIRunner:       cliRunner,
-		ConfigResolver:  configResolver,
+// WithWorkspaceMembers sets workspace members
+func WithWorkspaceMembers(ap string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.WorkspaceMembers = ap
+		return cargo
+	}
+}
+
+// WithBOM sets libcnb.BOM
+func WithBOM(bom *libcnb.BOM) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.BOM = bom
+		return cargo
+	}
+}
+
+// WithAdditionalMetadata sets additional metadata to include
+func WithAdditionalMetadata(metadata map[string]interface{}) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.AdditionalMetadata = metadata
+		return cargo
+	}
+}
+
+// WithInstallArgs sets install args
+func WithInstallArgs(args string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.InstallArgs = args
+		return cargo
+	}
+}
+
+// WithCargoService sets cargo service
+func WithCargoService(s runner.CargoService) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.CargoService = s
+		return cargo
+	}
+}
+
+// WithLogger sets logger
+func WithLogger(l bard.Logger) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.Logger = l
+		return cargo
+	}
+}
+
+type Cargo struct {
+	AdditionalMetadata map[string]interface{}
+	ApplicationPath    string
+	BOM                *libcnb.BOM
+	Cache              Cache
+	InstallArgs        string
+	CargoService       runner.CargoService
+	LayerContributor   libpak.LayerContributor
+	Logger             bard.Logger
+	WorkspaceMembers   string
+}
+
+// NewCargo creates a new cargo with the given options
+func NewCargo(options ...Option) (Cargo, error) {
+	cargo := Cargo{}
+
+	for _, option := range options {
+		cargo = option(cargo)
 	}
 
-	expected, err := cargo.expectedMetadata(additionalMetadata)
+	metadata := map[string]interface{}{
+		"additional-arguments": cargo.InstallArgs,
+		"workspace-members":    cargo.WorkspaceMembers,
+	}
+
+	var err error
+	metadata["files"], err = sherpa.NewFileListingHash(cargo.ApplicationPath)
 	if err != nil {
-		return Cargo{}, fmt.Errorf("failed to generate expected metadata\n%w", err)
+		return Cargo{}, fmt.Errorf("unable to create file listing for %s\n%w", cargo.ApplicationPath, err)
 	}
 
-	cargo.LayerContributor = libpak.NewLayerContributor("Rust Application", expected, libcnb.LayerTypes{
+	metadata["cargo-version"], err = cargo.CargoService.CargoVersion()
+	if err != nil {
+		return Cargo{}, fmt.Errorf("unable to determine cargo version\n%w", err)
+	}
+
+	metadata["rust-version"], err = cargo.CargoService.RustVersion()
+	if err != nil {
+		return Cargo{}, fmt.Errorf("unable to determine rust version\n%w", err)
+	}
+
+	for k, v := range cargo.AdditionalMetadata {
+		metadata[k] = v
+	}
+
+	cargo.LayerContributor = libpak.NewLayerContributor("Rust Application", metadata, libcnb.LayerTypes{
 		Cache: true,
 	})
+	cargo.LayerContributor.Logger = cargo.Logger
 
 	return cargo, nil
 }
 
-func (c Cargo) expectedMetadata(additionalMetadata map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-
-	rawArgs, _ := c.ConfigResolver.Resolve("BP_CARGO_INSTALL_ARGS")
-	rawMembers, _ := c.ConfigResolver.Resolve("BP_CARGO_WORKSPACE_MEMBERS")
-	metadata := map[string]interface{}{
-		"additional-arguments": rawArgs,
-		"workspace-members":    rawMembers,
-	}
-
-	metadata["files"], err = sherpa.NewFileListingHash(c.ApplicationPath)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create file listing for %s\n%w", c.ApplicationPath, err)
-	}
-
-	metadata["cargo-version"], err = c.CLIRunner.CargoVersion()
-	if err != nil {
-		return nil, fmt.Errorf("unable to determine cargo version\n%w", err)
-	}
-
-	metadata["rust-version"], err = c.CLIRunner.RustVersion()
-	if err != nil {
-		return nil, fmt.Errorf("unable to determine rust version\n%w", err)
-	}
-
-	for k, v := range additionalMetadata {
-		metadata[k] = v
-	}
-
-	return metadata, nil
-}
-
 func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
-	c.LayerContributor.Logger = c.Logger
-
 	layer, err := c.LayerContributor.Contribute(layer, func() (libcnb.Layer, error) {
 		preserver := mtimes.NewPreserver(c.Logger)
 
@@ -111,45 +159,45 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 
 		err = preserver.RestoreAll(targetPath, cargoHome, layer.Path)
 		if err != nil {
-			return libcnb.Layer{}, err
+			return libcnb.Layer{}, fmt.Errorf("unable to restore all\n%w", err)
 		}
 
-		members, err := c.CLIRunner.WorkspaceMembers(c.ApplicationPath, layer)
+		members, err := c.CargoService.WorkspaceMembers(c.ApplicationPath, layer)
 		if err != nil {
-			return libcnb.Layer{}, err
+			return libcnb.Layer{}, fmt.Errorf("unable to fetch members\n%w", err)
 		}
 
 		isPathSet, err := c.IsPathSet()
 		if err != nil {
-			return libcnb.Layer{}, err
+			return libcnb.Layer{}, fmt.Errorf("unable to check if path set\n%w", err)
 		}
 
 		if len(members) == 0 {
 			c.Logger.Body("WARNING: no members detected, trying to install with no path. This may fail.")
 			// run `cargo install`
-			err = c.CLIRunner.Install(c.ApplicationPath, layer)
+			err = c.CargoService.Install(c.ApplicationPath, layer)
 			if err != nil {
-				return libcnb.Layer{}, err
+				return libcnb.Layer{}, fmt.Errorf("unable to install default\n%w", err)
 			}
 		} else if (len(members) == 1 && members[0].Path == c.ApplicationPath) || isPathSet {
 			// run `cargo install`
-			err = c.CLIRunner.Install(c.ApplicationPath, layer)
+			err = c.CargoService.Install(c.ApplicationPath, layer)
 			if err != nil {
-				return libcnb.Layer{}, err
+				return libcnb.Layer{}, fmt.Errorf("unable to install single\n%w", err)
 			}
 		} else { // if len(members) > 1 and --path not set
 			// run `cargo install --path=` for each member in the workspace
 			for _, member := range members {
-				err = c.CLIRunner.InstallMember(member.Path, c.ApplicationPath, layer)
+				err = c.CargoService.InstallMember(member.Path, c.ApplicationPath, layer)
 				if err != nil {
-					return libcnb.Layer{}, err
+					return libcnb.Layer{}, fmt.Errorf("unable to install member\n%w", err)
 				}
 			}
 		}
 
 		err = preserver.PreserveAll(targetPath, cargoHome, layer.Path)
 		if err != nil {
-			return libcnb.Layer{}, err
+			return libcnb.Layer{}, fmt.Errorf("unable to preserve all\n%w", err)
 		}
 
 		return layer, nil
@@ -158,7 +206,7 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 		return libcnb.Layer{}, fmt.Errorf("unable to contribute application layer\n%w", err)
 	}
 
-	// TODO: Add BOM stuff, cli_runner needs to do this & extract from Cargo.toml
+	// TODO: Add BOM stuff, cargoService needs to do this & extract from Cargo.toml
 	// entry, err := c.Cache.AsBOMEntry()
 	// if err != nil {
 	// 	return libcnb.Layer{}, fmt.Errorf("unable to generate build dependencies\n%w", err)
@@ -204,9 +252,7 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 }
 
 func (c Cargo) IsPathSet() (bool, error) {
-	rawArgs, _ := c.ConfigResolver.Resolve("BP_CARGO_INSTALL_ARGS")
-
-	envArgs, err := FilterInstallArgs(rawArgs)
+	envArgs, err := runner.FilterInstallArgs(c.InstallArgs)
 	if err != nil {
 		return false, fmt.Errorf("unable to filter: %w", err)
 	}
@@ -218,6 +264,40 @@ func (c Cargo) IsPathSet() (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (c Cargo) BuildProcessTypes() ([]libcnb.Process, error) {
+	binaryTargets, err := c.CargoService.ProjectTargets(c.ApplicationPath)
+	if err != nil {
+		return []libcnb.Process{}, fmt.Errorf("unable to find project targets\n%w", err)
+	}
+
+	procs := []libcnb.Process{}
+	for _, target := range binaryTargets {
+		procs = append(procs, libcnb.Process{
+			Type:      target,
+			Command:   filepath.Join(c.ApplicationPath, "bin", target),
+			Arguments: []string{},
+			Direct:    true,
+			Default:   false,
+		})
+	}
+
+	if len(procs) > 0 {
+		found := false
+		for i := 0; i < len(procs) && !found; i++ {
+			if procs[i].Type == "web" {
+				procs[i].Default = true
+				found = true
+			}
+		}
+
+		if !found {
+			procs[0].Default = true
+		}
+	}
+
+	return procs, nil
 }
 
 func (c Cargo) Name() string {

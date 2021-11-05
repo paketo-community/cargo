@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package cargo_test
+package runner_test
 
 import (
 	"bytes"
@@ -24,12 +24,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/buildpacks/libcnb"
-	"github.com/paketo-community/cargo/cargo"
+	"github.com/paketo-community/cargo/runner"
 
-	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/effect"
 	"github.com/paketo-buildpacks/libpak/effect/mocks"
@@ -40,7 +40,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
+func testRunners(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect     = NewWithT(t).Expect
 		workingDir = "/does/not/matter"
@@ -56,11 +56,6 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 
 		cargoHome, err = ioutil.TempDir("", "working-dir")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(os.Setenv("CARGO_HOME", cargoHome)).To(Succeed())
-	})
-
-	it.After(func() {
-		Expect(os.Unsetenv("CARGO_HOME")).To(Succeed())
 	})
 
 	it("fetches cargo version", func() {
@@ -79,10 +74,11 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			return nil
 		})
 
-		runner := cargo.NewCLIRunner(
-			libpak.ConfigurationResolver{},
-			executor,
-			bard.Logger{})
+		runner := runner.NewCargoRunner(
+			runner.WithCargoHome(cargoHome),
+			runner.WithExecutor(executor),
+			runner.WithLogger(bard.Logger{}))
+
 		version, err := runner.CargoVersion()
 
 		Expect(err).ToNot(HaveOccurred())
@@ -105,10 +101,11 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			return nil
 		})
 
-		runner := cargo.NewCLIRunner(
-			libpak.ConfigurationResolver{},
-			executor,
-			bard.Logger{})
+		runner := runner.NewCargoRunner(
+			runner.WithCargoHome(cargoHome),
+			runner.WithExecutor(executor),
+			runner.WithLogger(bard.Logger{}))
+
 		version, err := runner.RustVersion()
 
 		Expect(err).ToNot(HaveOccurred())
@@ -117,7 +114,7 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 
 	context("builds install arguments", func() {
 		it("builds a default set of arguments", func() {
-			runner := cargo.CLIRunner{}
+			runner := runner.CargoRunner{}
 
 			args, err := runner.BuildArgs(destLayer, "foo")
 			Expect(err).ToNot(HaveOccurred())
@@ -130,16 +127,10 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		context("with custom args", func() {
-			it.Before(func() {
-				Expect(os.Setenv("BP_CARGO_INSTALL_ARGS", "--path=./todo --foo=bar --foo baz")).To(Succeed())
-			})
-
-			it.After(func() {
-				Expect(os.Unsetenv("BP_CARGO_INSTALL_ARGS")).To(Succeed())
-			})
-
 			it("builds with custom args", func() {
-				runner := cargo.CLIRunner{}
+				runner := runner.CargoRunner{
+					CargoInstallArgs: "--path=./todo --foo=bar --foo baz",
+				}
 
 				args, err := runner.BuildArgs(destLayer, ".")
 				Expect(err).ToNot(HaveOccurred())
@@ -158,36 +149,36 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 
 	context("BP_CARGO_INSTALL_ARGS filters --color and --root", func() {
 		it("filters --root", func() {
-			Expect(cargo.FilterInstallArgs("--root=somewhere")).To(BeEmpty())
-			Expect(cargo.FilterInstallArgs("--root somewhere")).To(BeEmpty())
-			Expect(cargo.FilterInstallArgs("--root=somewhere --root somewhere --bar=baz")).To(Equal([]string{"--bar=baz"}))
-			Expect(cargo.FilterInstallArgs("--foo bar --root somewhere --baz --test true")).To(Equal([]string{"--foo", "bar", "--baz", "--test", "true"}))
+			Expect(runner.FilterInstallArgs("--root=somewhere")).To(BeEmpty())
+			Expect(runner.FilterInstallArgs("--root somewhere")).To(BeEmpty())
+			Expect(runner.FilterInstallArgs("--root=somewhere --root somewhere --bar=baz")).To(Equal([]string{"--bar=baz"}))
+			Expect(runner.FilterInstallArgs("--foo bar --root somewhere --baz --test true")).To(Equal([]string{"--foo", "bar", "--baz", "--test", "true"}))
 		})
 		it("filters --color", func() {
-			Expect(cargo.FilterInstallArgs("--color=never")).To(BeEmpty())
-			Expect(cargo.FilterInstallArgs("--color always")).To(BeEmpty())
-			Expect(cargo.FilterInstallArgs("--color=always --color never --bar=baz")).To(Equal([]string{"--bar=baz"}))
-			Expect(cargo.FilterInstallArgs("--foo bar --color always --baz --test true")).To(Equal([]string{"--foo", "bar", "--baz", "--test", "true"}))
+			Expect(runner.FilterInstallArgs("--color=never")).To(BeEmpty())
+			Expect(runner.FilterInstallArgs("--color always")).To(BeEmpty())
+			Expect(runner.FilterInstallArgs("--color=always --color never --bar=baz")).To(Equal([]string{"--bar=baz"}))
+			Expect(runner.FilterInstallArgs("--foo bar --color always --baz --test true")).To(Equal([]string{"--foo", "bar", "--baz", "--test", "true"}))
 		})
 		it("filters both --color and --root", func() {
-			Expect(cargo.FilterInstallArgs("--color=never --root=blah")).To(BeEmpty())
-			Expect(cargo.FilterInstallArgs("--color always --root blah")).To(BeEmpty())
-			Expect(cargo.FilterInstallArgs("--color=always --root=blah --root blah --color never --bar=baz")).To(Equal([]string{"--bar=baz"}))
-			Expect(cargo.FilterInstallArgs("--foo bar --root=blah --color always --baz --test true")).To(Equal([]string{"--foo", "bar", "--baz", "--test", "true"}))
+			Expect(runner.FilterInstallArgs("--color=never --root=blah")).To(BeEmpty())
+			Expect(runner.FilterInstallArgs("--color always --root blah")).To(BeEmpty())
+			Expect(runner.FilterInstallArgs("--color=always --root=blah --root blah --color never --bar=baz")).To(Equal([]string{"--bar=baz"}))
+			Expect(runner.FilterInstallArgs("--foo bar --root=blah --color always --baz --test true")).To(Equal([]string{"--foo", "bar", "--baz", "--test", "true"}))
 		})
 	})
 
 	context("set default --path argument", func() {
 		it("is specified by the user", func() {
-			Expect(cargo.AddDefaultPath([]string{"install", "--path"}, ".")).To(Equal([]string{"install", "--path"}))
-			Expect(cargo.AddDefaultPath([]string{"install", "--path=test"}, ".")).To(Equal([]string{"install", "--path=test"}))
-			Expect(cargo.AddDefaultPath([]string{"install", "--path", "test"}, ".")).To(Equal([]string{"install", "--path", "test"}))
+			Expect(runner.AddDefaultPath([]string{"install", "--path"}, ".")).To(Equal([]string{"install", "--path"}))
+			Expect(runner.AddDefaultPath([]string{"install", "--path=test"}, ".")).To(Equal([]string{"install", "--path=test"}))
+			Expect(runner.AddDefaultPath([]string{"install", "--path", "test"}, ".")).To(Equal([]string{"install", "--path", "test"}))
 		})
 
 		it("should be the default", func() {
-			Expect(cargo.AddDefaultPath([]string{"install"}, ".")).To(Equal([]string{"install", "--path=."}))
-			Expect(cargo.AddDefaultPath([]string{"install", "--foo=bar"}, ".")).To(Equal([]string{"install", "--foo=bar", "--path=."}))
-			Expect(cargo.AddDefaultPath([]string{"install", "--foo", "bar"}, ".")).To(Equal([]string{"install", "--foo", "bar", "--path=."}))
+			Expect(runner.AddDefaultPath([]string{"install"}, ".")).To(Equal([]string{"install", "--path=."}))
+			Expect(runner.AddDefaultPath([]string{"install", "--foo=bar"}, ".")).To(Equal([]string{"install", "--foo=bar", "--path=."}))
+			Expect(runner.AddDefaultPath([]string{"install", "--foo", "bar"}, ".")).To(Equal([]string{"install", "--foo", "bar", "--path=."}))
 		})
 	})
 
@@ -207,28 +198,16 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 					ex.Dir == workingDir
 			})).Return(nil)
 
-			runner := cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{
-					Configurations: []libpak.BuildpackConfiguration{
-						{Name: "BP_CARGO_INSTALL_ARGS", Build: true, Default: ""},
-					},
-				},
-				executor,
-				logger)
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithExecutor(executor),
+				runner.WithLogger(logger))
 
 			err := runner.Install(workingDir, destLayer)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		context("sets custom args", func() {
-			it.Before(func() {
-				Expect(os.Setenv("BP_CARGO_INSTALL_ARGS", "--path=./todo --foo=baz bar")).To(Succeed())
-			})
-
-			it.After(func() {
-				Expect(os.Unsetenv("BP_CARGO_INSTALL_ARGS")).To(Succeed())
-			})
-
 			it("builds correctly with custom args", func() {
 				logBuf := bytes.Buffer{}
 				logger := bard.NewLogger(&logBuf)
@@ -246,14 +225,11 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 						ex.Dir == workingDir
 				})).Return(nil)
 
-				runner := cargo.NewCLIRunner(
-					libpak.ConfigurationResolver{
-						Configurations: []libpak.BuildpackConfiguration{
-							{Name: "BP_CARGO_INSTALL_ARGS", Build: true, Default: ""},
-						},
-					},
-					executor,
-					logger)
+				runner := runner.NewCargoRunner(
+					runner.WithCargoHome(cargoHome),
+					runner.WithCargoInstallArgs("--path=./todo --foo=baz bar"),
+					runner.WithExecutor(executor),
+					runner.WithLogger(logger))
 
 				err := runner.Install(workingDir, destLayer)
 				Expect(err).ToNot(HaveOccurred())
@@ -282,10 +258,11 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 					return nil
 				})
 
-				runner := cargo.NewCLIRunner(
-					libpak.ConfigurationResolver{},
-					executor,
-					logger)
+				runner := runner.NewCargoRunner(
+					runner.WithCargoHome(cargoHome),
+					runner.WithExecutor(executor),
+					runner.WithLogger(logger))
+
 				urls, err := runner.WorkspaceMembers(workingDir, destLayer)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -309,14 +286,6 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			context("member filter is set", func() {
-				it.Before(func() {
-					Expect(os.Setenv("BP_CARGO_WORKSPACE_MEMBERS", "todo,jokes")).ToNot(HaveOccurred())
-				})
-
-				it.After(func() {
-					Expect(os.Unsetenv("BP_CARGO_WORKSPACE_MEMBERS")).To(Succeed())
-				})
-
 				it("parses the member paths from metadata and preserves order with filters", func() {
 					logBuf := bytes.Buffer{}
 					logger := bard.NewLogger(&logBuf)
@@ -338,10 +307,12 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 						return nil
 					})
 
-					runner := cargo.NewCLIRunner(
-						libpak.ConfigurationResolver{},
-						executor,
-						logger)
+					runner := runner.NewCargoRunner(
+						runner.WithCargoHome(cargoHome),
+						runner.WithCargoWorkspaceMembers("todo,jokes"),
+						runner.WithExecutor(executor),
+						runner.WithLogger(logger))
+
 					urls, err := runner.WorkspaceMembers(workingDir, destLayer)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -375,14 +346,10 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 					ex.Dir == workingDir
 			})).Return(fmt.Errorf("expected"))
 
-			runner := cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{
-					Configurations: []libpak.BuildpackConfiguration{
-						{Name: "BP_CARGO_INSTALL_ARGS", Build: true, Default: ""},
-					},
-				},
-				executor,
-				logger)
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithExecutor(executor),
+				runner.WithLogger(logger))
 
 			err := runner.Install(workingDir, destLayer)
 			Expect(err).To(HaveOccurred())
@@ -391,55 +358,17 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	context("when cargo home has files", func() {
-		var (
-			err    error
-			logBuf bytes.Buffer
-			logger bard.Logger
-		)
-
-		it.Before(func() {
-			logBuf = bytes.Buffer{}
-			logger = bard.NewLogger(&logBuf)
-		})
-
 		it.After(func() {
 			Expect(os.RemoveAll(cargoHome)).To(Succeed())
 		})
 
-		it("fails if CARGO_HOME is not set", func() {
-			os.Unsetenv("CARGO_HOME")
-
-			err = cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{},
-				nil,
-				logger,
-			).CleanCargoHomeCache()
-
-			Expect(err).To(MatchError("unable to find CARGO_HOME"))
-		})
-
-		it("fails if CARGO_HOME is set but empty", func() {
-			os.Setenv("CARGO_HOME", "  ")
-
-			err = cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{},
-				nil,
-				logger,
-			).CleanCargoHomeCache()
-
-			Expect(err).To(MatchError("unable to find CARGO_HOME"))
-		})
-
 		it("do nothing if CARGO_HOME is set but does not exist", func() {
-			os.Setenv("CARGO_HOME", "/foo/bar")
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome("/foo/bar"),
+				runner.WithExecutor(executor),
+				runner.WithLogger(bard.Logger{}))
 
-			err = cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{},
-				nil,
-				logger,
-			).CleanCargoHomeCache()
-
-			Expect(err).To(BeNil())
+			Expect(runner.CleanCargoHomeCache()).To(BeNil())
 		})
 
 		it("is cleaned up", func() {
@@ -454,13 +383,12 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			Expect(os.MkdirAll(filepath.Join(cargoHome, "git", "bar"), 0755)).ToNot(HaveOccurred())
 			Expect(os.MkdirAll(filepath.Join(cargoHome, "baz"), 0755)).ToNot(HaveOccurred())
 
-			err = cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{},
-				nil,
-				logger,
-			).CleanCargoHomeCache()
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithExecutor(executor),
+				runner.WithLogger(bard.Logger{}))
 
-			Expect(err).ToNot(HaveOccurred())
+			Expect(runner.CleanCargoHomeCache()).ToNot(HaveOccurred())
 			Expect(filepath.Join(cargoHome, "bin")).To(BeADirectory())
 			Expect(filepath.Join(cargoHome, "registry", "index")).To(BeADirectory())
 			Expect(filepath.Join(cargoHome, "registry", "cache")).To(BeADirectory())
@@ -477,25 +405,114 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 			// To destroy
 			Expect(os.MkdirAll(filepath.Join(cargoHome, "baz"), 0755)).ToNot(HaveOccurred())
 
-			err = cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{
-					Configurations: []libpak.BuildpackConfiguration{{Default: "*"}},
-				},
-				nil,
-				logger,
-			).CleanCargoHomeCache()
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithExecutor(executor),
+				runner.WithLogger(bard.Logger{}))
 
-			Expect(err).ToNot(HaveOccurred())
+			Expect(runner.CleanCargoHomeCache()).ToNot(HaveOccurred())
 			Expect(filepath.Join(cargoHome, "bin")).To(BeADirectory())
 			Expect(filepath.Join(cargoHome, "baz")).ToNot(BeADirectory())
 		})
 	})
 
+	context("package targets", func() {
+		it("reads package target names", func() {
+			metadata := BuildMetadataWithPackages("/does/not/matter",
+				buildMetadata{
+					members: []string{
+						"basics 2.0.0 (path+file:///does/not/matter/basics)",
+					},
+					packages: []buildPackage{
+						{
+							id: "basics 2.0.0 (path+file:///does/not/matter/basics)",
+							targets: []buildTarget{
+								{kind: "lib", crateType: "lib", name: "inflector", srcPath: "/cargo_home/registry/src/github.com-1ecc6299db9ec823/Inflector-0.11.4/src/lib.rs", edition: "2015", doc: "true", doctest: "true", test: "true"},
+								{kind: "bin", crateType: "bin", name: "decrypt", srcPath: "/does/not/matter/src/bin/decrypt/main.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+								{kind: "bin", crateType: "bin", name: "encrypt", srcPath: "/does/not/matter/src/bin/encrypt/main.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+								{kind: "bin", crateType: "bin", name: "pksign", srcPath: "/does/not/matter/src/bin/pksign/main.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+								{kind: "bin", crateType: "bin", name: "gcc-shim", srcPath: "/cargo_home/registry/src/github.com-1ecc6299db9ec823/cc-1.0.50/src/bin/gcc-shim.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+							},
+						},
+					},
+				})
+
+			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
+				Expect(ex.Args).To(Equal([]string{"metadata", "--format-version=1", "--no-deps"}))
+				return true
+			})).Return(func(ex effect.Execution) error {
+				_, err := ex.Stdout.Write([]byte(metadata))
+				Expect(err).ToNot(HaveOccurred())
+				return nil
+			})
+
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithExecutor(executor),
+				runner.WithLogger(bard.Logger{}))
+
+			names, err := runner.ProjectTargets(workingDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(3))
+			Expect(names).To(ContainElement("decrypt"))
+			Expect(names).To(ContainElement("encrypt"))
+			Expect(names).To(ContainElement("pksign"))
+		})
+
+		it("reads filtered target names", func() {
+			metadata := BuildMetadataWithPackages("/does/not/matter",
+				buildMetadata{
+					members: []string{
+						"basics 2.0.0 (path+file:///does/not/matter/basics)",
+						"advanced 2.0.0 (path+file:///does/not/matter/advanced)",
+						"expert 2.0.0 (path+file:///does/not/matter/expert)",
+					},
+					packages: []buildPackage{
+						{
+							id: "advanced 2.0.0 (path+file:///does/not/matter/advanced)",
+							targets: []buildTarget{
+								{kind: "lib", crateType: "lib", name: "inflector", srcPath: "/cargo_home/registry/src/github.com-1ecc6299db9ec823/Inflector-0.11.4/src/lib.rs", edition: "2015", doc: "true", doctest: "true", test: "true"},
+								{kind: "bin", crateType: "bin", name: "decrypt", srcPath: "/does/not/matter/src/bin/decrypt/main.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+								{kind: "bin", crateType: "bin", name: "gcc-shim", srcPath: "/cargo_home/registry/src/github.com-1ecc6299db9ec823/cc-1.0.50/src/bin/gcc-shim.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+							},
+						},
+						{
+							id: "expert 2.0.0 (path+file:///does/not/matter/expert)",
+							targets: []buildTarget{
+								{kind: "lib", crateType: "lib", name: "inflector", srcPath: "/cargo_home/registry/src/github.com-1ecc6299db9ec823/Inflector-0.11.4/src/lib.rs", edition: "2015", doc: "true", doctest: "true", test: "true"},
+								{kind: "bin", crateType: "bin", name: "foo", srcPath: "/does/not/matter/src/bin/encrypt/main.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+								{kind: "bin", crateType: "bin", name: "bar", srcPath: "/does/not/matter/src/bin/pksign/main.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+								{kind: "bin", crateType: "bin", name: "gcc-shim", srcPath: "/cargo_home/registry/src/github.com-1ecc6299db9ec823/cc-1.0.50/src/bin/gcc-shim.rs", edition: "2018", doc: "true", doctest: "false", test: "true"},
+							},
+						},
+					},
+				})
+
+			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
+				Expect(ex.Args).To(Equal([]string{"metadata", "--format-version=1", "--no-deps"}))
+				return true
+			})).Return(func(ex effect.Execution) error {
+				_, err := ex.Stdout.Write([]byte(metadata))
+				Expect(err).ToNot(HaveOccurred())
+				return nil
+			})
+
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithExecutor(executor),
+				runner.WithCargoWorkspaceMembers("expert"),
+				runner.WithLogger(bard.Logger{}))
+
+			names, err := runner.ProjectTargets(workingDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(2))
+			Expect(names).To(ContainElement("foo"))
+			Expect(names).To(ContainElement("bar"))
+		})
+	})
+
 	context("workspace members", func() {
 		it("default runs all workspaces", func() {
-			logBuf := bytes.Buffer{}
-			logger := bard.NewLogger(&logBuf)
-
 			metadata := BuildMetadata("/workspace",
 				[]string{
 					"basics 2.0.0 (path+file:///workspace/basics)",
@@ -513,14 +530,10 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 				return nil
 			})
 
-			runner := cargo.NewCLIRunner(
-				libpak.ConfigurationResolver{
-					Configurations: []libpak.BuildpackConfiguration{
-						{Name: "BP_CARGO_WORKSPACE_MEMBERS", Build: true, Default: ""},
-					},
-				},
-				executor,
-				logger)
+			runner := runner.NewCargoRunner(
+				runner.WithCargoHome(cargoHome),
+				runner.WithExecutor(executor),
+				runner.WithLogger(bard.Logger{}))
 
 			urls, err := runner.WorkspaceMembers(workingDir, destLayer)
 			Expect(err).ToNot(HaveOccurred())
@@ -528,18 +541,7 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		context("when specifying a subset of workspace members", func() {
-			it.Before(func() {
-				Expect(os.Setenv("BP_CARGO_WORKSPACE_MEMBERS", "basics,jokes")).To(Succeed())
-			})
-
-			it.After(func() {
-				Expect(os.Unsetenv("BP_CARGO_WORKSPACE_MEMBERS")).To(Succeed())
-			})
-
 			it("filters workspace members", func() {
-				logBuf := bytes.Buffer{}
-				logger := bard.NewLogger(&logBuf)
-
 				metadata := BuildMetadata("/workspace",
 					[]string{
 						"basics 2.0.0 (path+file:///workspace/basics)",
@@ -557,14 +559,11 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 					return nil
 				})
 
-				runner := cargo.NewCLIRunner(
-					libpak.ConfigurationResolver{
-						Configurations: []libpak.BuildpackConfiguration{
-							{Name: "BP_CARGO_WORKSPACE_MEMBERS", Build: true, Default: ""},
-						},
-					},
-					executor,
-					logger)
+				runner := runner.NewCargoRunner(
+					runner.WithCargoHome(cargoHome),
+					runner.WithCargoWorkspaceMembers("basics,jokes"),
+					runner.WithExecutor(executor),
+					runner.WithLogger(bard.Logger{}))
 
 				urls, err := runner.WorkspaceMembers(workingDir, destLayer)
 				Expect(err).ToNot(HaveOccurred())
@@ -583,9 +582,42 @@ func testCLIRunner(t *testing.T, context spec.G, it spec.S) {
 	})
 }
 
+type buildMetadata struct {
+	members  []string
+	packages []buildPackage
+}
+
+type buildPackage struct {
+	id      string
+	targets []buildTarget
+}
+
+type buildTarget struct {
+	kind      string
+	crateType string
+	name      string
+	srcPath   string
+	edition   string
+	doc       string
+	doctest   string
+	test      string
+}
+
 func BuildMetadata(workspacePath string, members []string) string {
+	pkgs := []buildPackage{}
+	for _, member := range members {
+		pkgs = append(pkgs, buildPackage{id: member})
+	}
+
+	return BuildMetadataWithPackages(workspacePath, buildMetadata{
+		members:  members,
+		packages: pkgs,
+	})
+}
+
+func BuildMetadataWithPackages(workspacePath string, data buildMetadata) string {
 	tmp := `{
-  "packages": [],
+  "packages": %s,
   "workspace_root": "%s",
   "target_directory": "%s",
   "workspace_members": %s,
@@ -595,14 +627,29 @@ func BuildMetadata(workspacePath string, members []string) string {
 }`
 
 	memberJson := "["
-	for i, member := range members {
+	for i, member := range data.members {
 		memberJson += fmt.Sprintf(`"%s"`, member)
-		if i != len(members)-1 {
+		if i != len(data.members)-1 {
 			memberJson += ","
 		}
 		memberJson += "\n"
 	}
 	memberJson += "]"
 
-	return fmt.Sprintf(tmp, workspacePath, filepath.Join(workspacePath, "target"), memberJson)
+	packageJson := `[`
+	for _, pkg := range data.packages {
+		packageJson += fmt.Sprintf(`{"id": "%s", "targets": [ `, pkg.id)
+		for i, t := range pkg.targets {
+			packageJson += fmt.Sprintf(`{"kind": ["%s"], "crate_types": ["%s"], "name": "%s", "src_path": "%s", "edition": "%s", "doc": %s, "doctest": %s, "test": %s}`,
+				t.kind, t.crateType, t.name, t.srcPath, t.edition, t.doc, t.doctest, t.test)
+			if i != len(pkg.targets)-1 {
+				packageJson += ","
+			}
+			packageJson += "\n"
+		}
+		packageJson += `]},`
+	}
+	packageJson = strings.Trim(packageJson, ",") + `]`
+
+	return fmt.Sprintf(tmp, packageJson, workspacePath, filepath.Join(workspacePath, "target"), memberJson)
 }

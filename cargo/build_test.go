@@ -20,12 +20,15 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/buildpacks/libcnb"
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-community/cargo/cargo"
+	"github.com/paketo-community/cargo/runner/mocks"
 	"github.com/sclevine/spec"
+	"github.com/stretchr/testify/mock"
 
 	. "github.com/onsi/gomega"
 )
@@ -36,6 +39,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		ctx        libcnb.BuildContext
 		cargoBuild cargo.Build
+		service    mocks.CargoService
 	)
 
 	it.Before(func() {
@@ -44,18 +48,20 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		ctx.Application.Path, err = ioutil.TempDir("", "build-application")
 		Expect(err).NotTo(HaveOccurred())
 
-		// ctx.Buildpack.Metadata = map[string]interface{}{
-		// 	"configurations": []map[string]interface{}{
-		// 		{"name": "BP_MAVEN_BUILD_ARGUMENTS", "default": "test-argument"},
-		// 	},
-		// }
+		Expect(os.MkdirAll(filepath.Join(ctx.Application.Path, "bin"), 0755)).ToNot(HaveOccurred())
 
 		ctx.Layers.Path, err = ioutil.TempDir("", "build-layers")
 		Expect(err).NotTo(HaveOccurred())
 
+		service = mocks.CargoService{}
+
 		cargoBuild = cargo.Build{
-			Logger: bard.NewLogger(&bytes.Buffer{}),
+			Logger:       bard.NewLogger(&bytes.Buffer{}),
+			CargoService: &service,
 		}
+
+		service.On("CargoVersion").Return("1.2.3", nil)
+		service.On("RustVersion").Return("1.2.3", nil)
 	})
 
 	it.After(func() {
@@ -70,21 +76,58 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(result.Layers).To(HaveLen(0))
 	})
 
-	it("contributes cargo layer", func() {
-		ctx.Plan.Entries = append(ctx.Plan.Entries, libcnb.BuildpackPlanEntry{Name: "rust-cargo"})
+	context("build plan entry exists", func() {
+		it.Before(func() {
+			Expect(os.Setenv("CARGO_HOME", "/does/not/matter")).To(Succeed())
+		})
 
-		result, err := cargoBuild.Build(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		it.After(func() {
+			Expect(os.Unsetenv("CARGO_HOME")).To(Succeed())
+		})
 
-		Expect(result.Layers).To(HaveLen(2))
-		Expect(result.Layers[0].Name()).To(Equal("Cargo Cache"))
-		Expect(result.Layers[1].Name()).To(Equal("Cargo"))
+		it("contributes cargo layer", func() {
+			ctx.Plan.Entries = append(ctx.Plan.Entries, libcnb.BuildpackPlanEntry{Name: "rust-cargo"})
 
-		// TODO: BOM support isn't in yet
-		// Expect(result.BOM.Entries).To(HaveLen(1))
-		// Expect(result.BOM.Entries[0].Name).To(Equal("cargo"))
-		// Expect(result.BOM.Entries[0].Build).To(BeTrue())
-		// Expect(result.BOM.Entries[0].Launch).To(BeFalse())
+			service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"app1", "app2", "app3"}, nil)
+
+			result, err := cargoBuild.Build(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(result.Layers).To(HaveLen(2))
+			Expect(result.Layers[0].Name()).To(Equal("Cargo Cache"))
+			Expect(result.Layers[1].Name()).To(Equal("Cargo"))
+
+			Expect(result.Processes).To(HaveLen(3))
+			Expect(result.Processes).To(ContainElement(
+				libcnb.Process{
+					Type:      "app1",
+					Command:   filepath.Join(ctx.Application.Path, "bin", "app1"),
+					Arguments: []string{},
+					Direct:    true,
+					Default:   true,
+				}))
+			Expect(result.Processes).To(ContainElement(
+				libcnb.Process{
+					Type:      "app2",
+					Command:   filepath.Join(ctx.Application.Path, "bin", "app2"),
+					Arguments: []string{},
+					Direct:    true,
+					Default:   false,
+				}))
+			Expect(result.Processes).To(ContainElement(
+				libcnb.Process{
+					Type:      "app3",
+					Command:   filepath.Join(ctx.Application.Path, "bin", "app3"),
+					Arguments: []string{},
+					Direct:    true,
+					Default:   false,
+				}))
+
+			// TODO: BOM support isn't in yet
+			// Expect(result.BOM.Entries).To(HaveLen(1))
+			// Expect(result.BOM.Entries[0].Name).To(Equal("cargo"))
+			// Expect(result.BOM.Entries[0].Build).To(BeTrue())
+			// Expect(result.BOM.Entries[0].Launch).To(BeFalse())
+		})
 	})
-
 }
