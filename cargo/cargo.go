@@ -145,7 +145,8 @@ func NewCargo(options ...Option) (Cargo, error) {
 	}
 
 	cargo.LayerContributor = libpak.NewLayerContributor("Rust Application", metadata, libcnb.LayerTypes{
-		Cache: true,
+		Cache:  true,
+		Launch: true,
 	})
 	cargo.LayerContributor.Logger = cargo.Logger
 
@@ -243,27 +244,29 @@ DELETE:
 		}
 	}
 
-	// copy app files from layer to workspace
+	if err := os.MkdirAll(filepath.Join(c.ApplicationPath, "bin"), 0755); err != nil {
+		return libcnb.Layer{}, fmt.Errorf("unable make app path %s/bin\n%w", c.ApplicationPath, err)
+	}
+
+	// symlink app files from layer to workspace
 	err = filepath.Walk(filepath.Join(layer.Path, "bin"), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
+		destPath := strings.Replace(path, layer.Path, c.ApplicationPath, 1)
+
 		if info.IsDir() {
-			return nil // skip directories sherpa will create directories
+			return os.MkdirAll(destPath, 0755)
 		}
 
-		sourceFile, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("unable to open %s\n%w", path, err)
-		}
-
-		return sherpa.CopyFile(sourceFile,
-			strings.Replace(path, layer.Path, c.ApplicationPath, 1))
+		return os.Symlink(path, destPath)
 	})
 	if err != nil {
 		return libcnb.Layer{}, fmt.Errorf("unable to walk\n%w", err)
 	}
+
+	layer.LaunchEnvironment.Append("PATH", ":", filepath.Join(c.ApplicationPath, "bin"))
 
 	return layer, nil
 }
