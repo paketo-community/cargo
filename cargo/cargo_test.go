@@ -235,7 +235,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
-				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeTrue())
 
 				// app files should be deleted
 				Expect(appFile).ToNot(BeAnExistingFile())
@@ -249,6 +249,9 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
+
+				// Ensure `/workspace/bin` is added to the PATH at launch
+				Expect(outputLayer.LaunchEnvironment["PATH.append"]).To(Equal(filepath.Join(ctx.Application.Path, "bin")))
 			})
 
 			it("contributes cargo layer with one member", func() {
@@ -273,7 +276,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
-				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeTrue())
 
 				// app files should be deleted
 				Expect(appFile).ToNot(BeAnExistingFile())
@@ -287,6 +290,9 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
 				Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
+
+				// Ensure `/workspace/bin` is added to the PATH at launch
+				Expect(outputLayer.LaunchEnvironment["PATH.append"]).To(Equal(filepath.Join(ctx.Application.Path, "bin")))
 			})
 
 			context("--path is set", func() {
@@ -316,7 +322,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 					Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 					Expect(outputLayer.LayerTypes.Build).To(BeFalse())
-					Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
+					Expect(outputLayer.LayerTypes.Launch).To(BeTrue())
 
 					// app files should be deleted
 					Expect(appFile).ToNot(BeAnExistingFile())
@@ -330,6 +336,9 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
 					Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
 					Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
+
+					// Ensure `/workspace/bin` is added to the PATH at launch
+					Expect(outputLayer.LaunchEnvironment["PATH.append"]).To(Equal(filepath.Join(ctx.Application.Path, "bin")))
 				})
 			})
 
@@ -357,7 +366,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
-				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeTrue())
 
 				// app files should be deleted
 				Expect(appFile).ToNot(BeAnExistingFile())
@@ -378,6 +387,9 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				// make sure InstallMember ran three times
 				service.AssertNumberOfCalls(t, "InstallMember", 3)
+
+				// Ensure `/workspace/bin` is added to the PATH at launch
+				Expect(outputLayer.LaunchEnvironment["PATH.append"]).To(Equal(filepath.Join(ctx.Application.Path, "bin")))
 			})
 
 			it("fails cause CARGO_HOME isn't set", func() {
@@ -461,7 +473,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
-				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeTrue())
 
 				// app files should be deleted
 				Expect(appFile).ToNot(BeAnExistingFile())
