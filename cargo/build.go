@@ -18,6 +18,7 @@ package cargo
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/buildpacks/libcnb"
 	"github.com/paketo-buildpacks/libpak"
@@ -50,6 +51,12 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to locate cargo home")
 		}
 
+		excludeFoldersRaw, _ := cr.Resolve("BP_CARGO_EXCLUDE_FOLDERS")
+		var excludeFolders []string
+		for _, excludeFolder := range strings.Split(excludeFoldersRaw, ",") {
+			excludeFolders = append(excludeFolders, strings.TrimSpace(excludeFolder))
+		}
+
 		cargoWorkspaceMembers, _ := cr.Resolve("BP_CARGO_WORKSPACE_MEMBERS")
 		cargoInstallArgs, _ := cr.Resolve("BP_CARGO_INSTALL_ARGS")
 
@@ -74,7 +81,8 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			WithWorkspaceMembers(cargoWorkspaceMembers),
 			WithApplicationPath(context.Application.Path),
 			WithLogger(b.Logger),
-			WithCargoService(service))
+			WithCargoService(service),
+			WithExcludeFolders(excludeFolders))
 		if err != nil {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create cargo layer contributor\n%w", err)
 		}
