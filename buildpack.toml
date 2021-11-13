@@ -33,6 +33,12 @@ description = "the subset of workspace members for Cargo to install"
 default     = ""
 build       = true
 
+[[metadata.configurations]]
+name        = "BP_CARGO_EXCLUDE_FOLDERS"
+description = "folders that should not be deleted and should persist to the generated image"
+default     = "static, templates, public, html"
+build       = true
+
 [metadata]
 pre-package   = "scripts/build.sh"
 include-files = [

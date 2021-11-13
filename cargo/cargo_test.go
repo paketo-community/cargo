@@ -77,7 +77,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 			service.On("CargoVersion").Return("1.2.3", nil)
 			service.On("RustVersion").Return("1.2.3", nil)
 
-			appFile = filepath.Join(ctx.Application.Path, "main.rs")
+			Expect(os.MkdirAll(filepath.Join(ctx.Application.Path, "src"), 0755)).To(Succeed())
+			appFile = filepath.Join(ctx.Application.Path, "src", "main.rs")
 			Expect(ioutil.WriteFile(appFile, []byte{}, 0644)).To(Succeed())
 		})
 
@@ -395,6 +396,93 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				Expect(filepath.Join(inputLayer.Path, "mtimes.json")).ToNot(BeARegularFile())
 				Expect(filepath.Join(cargoHome, "mtimes.json")).ToNot(BeARegularFile())
 				Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).ToNot(BeARegularFile())
+			})
+		})
+
+		context("skip deleting certain app files", func() {
+			var (
+				c            cargo.Cargo
+				cacheLayer   libcnb.Layer
+				appFilesKeep []string
+				appFilesGone []string
+			)
+
+			it.Before(func() {
+				var err error
+
+				cache := cargo.Cache{AppPath: ctx.Application.Path, Logger: logger}
+				cacheLayer, err = ctx.Layers.Layer("cache-layer")
+				Expect(err).NotTo(HaveOccurred())
+				cacheLayer, err = cache.Contribute(cacheLayer)
+				Expect(err).NotTo(HaveOccurred())
+
+				appFilesKeep = []string{
+					filepath.Join(ctx.Application.Path, "static", "index.html"),
+					filepath.Join(ctx.Application.Path, "templates", "index.html"),
+				}
+
+				appFilesGone = []string{
+					filepath.Join(ctx.Application.Path, "target", "stuff"),
+					filepath.Join(ctx.Application.Path, "other", "file.txt"),
+				}
+
+				for _, appFile := range append(appFilesKeep, appFilesGone...) {
+					Expect(os.MkdirAll(filepath.Dir(appFile), 0755)).To(Succeed())
+					Expect(ioutil.WriteFile(appFile, []byte{}, 0644)).To(Succeed())
+				}
+
+				c, err = cargo.NewCargo(
+					cargo.WithApplicationPath(ctx.Application.Path),
+					cargo.WithCargoService(service),
+					cargo.WithExcludeFolders([]string{"static", "templates"}))
+
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			it("doesn't delete skipped folders", func() {
+				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{
+					{Scheme: "file", Path: filepath.Join(ctx.Application.Path)},
+				}, nil)
+
+				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
+					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
+					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					Expect(err).ToNot(HaveOccurred())
+					return nil
+				})
+
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"my-binary", "other"}, nil)
+
+				inputLayer, err := ctx.Layers.Layer("cargo-layer")
+				Expect(err).ToNot(HaveOccurred())
+
+				outputLayer, err := c.Contribute(inputLayer)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
+				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeFalse())
+
+				// app files should be deleted
+				Expect(appFile).ToNot(BeAnExistingFile())
+
+				for _, appFile := range appFilesKeep {
+					Expect(appFile).To(BeAnExistingFile())
+				}
+
+				for _, appFile := range appFilesGone {
+					Expect(appFile).ToNot(BeAnExistingFile())
+				}
+
+				// preserver should have run
+				Expect(filepath.Join(outputLayer.Path, "mtimes.json")).To(BeARegularFile())
+				Expect(filepath.Join(cargoHome, "mtimes.json")).To(BeARegularFile())
+				Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).To(BeARegularFile())
+
+				// we should have two copies of the binary, one in the layer an one in the app root
+				Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
+				Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
+				Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
 			})
 		})
 	})

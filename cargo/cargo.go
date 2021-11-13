@@ -90,6 +90,14 @@ func WithLogger(l bard.Logger) Option {
 	}
 }
 
+// WithExcludeFolders sets logger
+func WithExcludeFolders(f []string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.ExcludeFolders = f
+		return cargo
+	}
+}
+
 type Cargo struct {
 	AdditionalMetadata map[string]interface{}
 	ApplicationPath    string
@@ -99,6 +107,7 @@ type Cargo struct {
 	CargoService       runner.CargoService
 	LayerContributor   libpak.LayerContributor
 	Logger             bard.Logger
+	ExcludeFolders     []string
 	WorkspaceMembers   string
 }
 
@@ -219,7 +228,15 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 	if err != nil {
 		return libcnb.Layer{}, fmt.Errorf("unable to list children of %s\n%w", c.ApplicationPath, err)
 	}
+
+DELETE:
 	for _, f := range fs {
+		for _, excludeFolder := range c.ExcludeFolders {
+			if f.Name() == excludeFolder {
+				continue DELETE
+			}
+		}
+
 		file := filepath.Join(c.ApplicationPath, f.Name())
 		if err := os.RemoveAll(file); err != nil {
 			return libcnb.Layer{}, fmt.Errorf("unable to remove %s\n%w", file, err)
