@@ -25,6 +25,7 @@ import (
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/effect"
 	"github.com/paketo-community/cargo/runner"
+	"github.com/paketo-community/cargo/tini"
 )
 
 type Build struct {
@@ -44,6 +45,30 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 		cr, err := libpak.NewConfigurationResolver(context.Buildpack, &b.Logger)
 		if err != nil {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create configuration resolver\n%w", err)
+		}
+
+		tiniEnabled := !cr.ResolveBool("BP_CARGO_TINI_DISABLED")
+		if tiniEnabled {
+			dr, err := libpak.NewDependencyResolver(context)
+			if err != nil {
+				return libcnb.BuildResult{}, fmt.Errorf("unable to create dependency resolver\n%w", err)
+			}
+
+			dc, err := libpak.NewDependencyCache(context)
+			if err != nil {
+				return libcnb.BuildResult{}, fmt.Errorf("unable to create dependency cache\n%w", err)
+			}
+			dc.Logger = b.Logger
+
+			dep, err := dr.Resolve("tini", "")
+			if err != nil {
+				return libcnb.BuildResult{}, fmt.Errorf("unable to find dependency\n%w", err)
+			}
+
+			tini, be := tini.NewTini(dep, dc)
+			tini.Logger = b.Logger
+			result.BOM.Entries = append(result.BOM.Entries, be)
+			result.Layers = append(result.Layers, tini)
 		}
 
 		cargoHome, found := cr.Resolve("CARGO_HOME")
@@ -87,7 +112,7 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create cargo layer contributor\n%w", err)
 		}
 
-		result.Processes, err = cargoLayer.BuildProcessTypes()
+		result.Processes, err = cargoLayer.BuildProcessTypes(tiniEnabled)
 		if err != nil {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to build list of process types\n%w", err)
 		}

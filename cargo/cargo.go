@@ -286,7 +286,7 @@ func (c Cargo) IsPathSet() (bool, error) {
 	return false, nil
 }
 
-func (c Cargo) BuildProcessTypes() ([]libcnb.Process, error) {
+func (c Cargo) BuildProcessTypes(tiniEnabled bool) ([]libcnb.Process, error) {
 	binaryTargets, err := c.CargoService.ProjectTargets(c.ApplicationPath)
 	if err != nil {
 		return []libcnb.Process{}, fmt.Errorf("unable to find project targets\n%w", err)
@@ -294,10 +294,16 @@ func (c Cargo) BuildProcessTypes() ([]libcnb.Process, error) {
 
 	procs := []libcnb.Process{}
 	for _, target := range binaryTargets {
+		command := filepath.Join(c.ApplicationPath, "bin", target)
+		args := []string{}
+		if tiniEnabled {
+			args = append([]string{"-g", "--", command}, args...)
+			command = "tini"
+		}
 		procs = append(procs, libcnb.Process{
 			Type:      target,
-			Command:   filepath.Join(c.ApplicationPath, "bin", target),
-			Arguments: []string{},
+			Command:   command,
+			Arguments: args,
 			Direct:    true,
 			Default:   false,
 		})

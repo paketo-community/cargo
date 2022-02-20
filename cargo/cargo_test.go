@@ -118,7 +118,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					cargo.WithCargoService(service))
 				Expect(err).ToNot(HaveOccurred())
 
-				procs, err := r.BuildProcessTypes()
+				procs, err := r.BuildProcessTypes(false)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(procs).To(HaveLen(3))
@@ -156,7 +156,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					cargo.WithCargoService(service))
 				Expect(err).ToNot(HaveOccurred())
 
-				procs, err := r.BuildProcessTypes()
+				procs, err := r.BuildProcessTypes(false)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(procs).To(HaveLen(4))
@@ -189,6 +189,44 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 						Type:      "baz",
 						Command:   filepath.Join(ctx.Application.Path, "bin", "baz"),
 						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+			})
+
+			it("includes all binary targets as process types run by tini with first as default", func() {
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"foo", "bar", "baz"}, nil)
+
+				r, err := cargo.NewCargo(
+					cargo.WithApplicationPath(ctx.Application.Path),
+					cargo.WithCargoService(service))
+				Expect(err).ToNot(HaveOccurred())
+
+				procs, err := r.BuildProcessTypes(true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(procs).To(HaveLen(3))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "foo",
+						Command:   "tini",
+						Arguments: []string{"-g", "--", filepath.Join(ctx.Application.Path, "bin", "foo")},
+						Direct:    true,
+						Default:   true,
+					}))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "bar",
+						Command:   "tini",
+						Arguments: []string{"-g", "--", filepath.Join(ctx.Application.Path, "bin", "bar")},
+						Direct:    true,
+						Default:   false,
+					}))
+				Expect(procs).To(ContainElement(
+					libcnb.Process{
+						Type:      "baz",
+						Command:   "tini",
+						Arguments: []string{"-g", "--", filepath.Join(ctx.Application.Path, "bin", "baz")},
 						Direct:    true,
 						Default:   false,
 					}))
