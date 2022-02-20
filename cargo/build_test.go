@@ -53,6 +53,22 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		ctx.Layers.Path, err = ioutil.TempDir("", "build-layers")
 		Expect(err).NotTo(HaveOccurred())
 
+		ctx.Buildpack.Metadata = map[string]interface{}{
+			"dependencies": []map[string]interface{}{
+				{
+					"id":      "tini",
+					"version": "1.1.1",
+					"stacks":  []interface{}{"test-stack-id"},
+					"cpes":    []string{"cpe:2.3:a:tini:tini:1.1.1:*:*:*:*:*:*:*"},
+					"purl":    "pkg:generic/tini@1.1.1",
+				},
+			},
+			"configurations": []map[string]interface{}{
+				{"name": "BP_CARGO_TINI_DISABLED", "default": "false"},
+			},
+		}
+		ctx.StackID = "test-stack-id"
+
 		service = mocks.CargoService{}
 
 		cargoBuild = cargo.Build{
@@ -93,34 +109,47 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			result, err := cargoBuild.Build(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(result.Layers).To(HaveLen(2))
-			Expect(result.Layers[0].Name()).To(Equal("Cargo Cache"))
-			Expect(result.Layers[1].Name()).To(Equal("Cargo"))
+			Expect(result.Layers).To(HaveLen(3))
+			Expect(result.Layers[0].Name()).To(Equal("tini"))
+			Expect(result.Layers[1].Name()).To(Equal("Cargo Cache"))
+			Expect(result.Layers[2].Name()).To(Equal("Cargo"))
 
 			Expect(result.Processes).To(HaveLen(3))
 			Expect(result.Processes).To(ContainElement(
 				libcnb.Process{
-					Type:      "app1",
-					Command:   filepath.Join(ctx.Application.Path, "bin", "app1"),
-					Arguments: []string{},
-					Direct:    true,
-					Default:   true,
+					Type:    "app1",
+					Command: "tini",
+					Arguments: []string{
+						"-g",
+						"--",
+						filepath.Join(ctx.Application.Path, "bin", "app1"),
+					},
+					Direct:  true,
+					Default: true,
 				}))
 			Expect(result.Processes).To(ContainElement(
 				libcnb.Process{
-					Type:      "app2",
-					Command:   filepath.Join(ctx.Application.Path, "bin", "app2"),
-					Arguments: []string{},
-					Direct:    true,
-					Default:   false,
+					Type:    "app2",
+					Command: "tini",
+					Arguments: []string{
+						"-g",
+						"--",
+						filepath.Join(ctx.Application.Path, "bin", "app2"),
+					},
+					Direct:  true,
+					Default: false,
 				}))
 			Expect(result.Processes).To(ContainElement(
 				libcnb.Process{
-					Type:      "app3",
-					Command:   filepath.Join(ctx.Application.Path, "bin", "app3"),
-					Arguments: []string{},
-					Direct:    true,
-					Default:   false,
+					Type:    "app3",
+					Command: "tini",
+					Arguments: []string{
+						"-g",
+						"--",
+						filepath.Join(ctx.Application.Path, "bin", "app3"),
+					},
+					Direct:  true,
+					Default: false,
 				}))
 
 			// TODO: BOM support isn't in yet
@@ -128,6 +157,61 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			// Expect(result.BOM.Entries[0].Name).To(Equal("cargo"))
 			// Expect(result.BOM.Entries[0].Build).To(BeTrue())
 			// Expect(result.BOM.Entries[0].Launch).To(BeFalse())
+		})
+
+		context("BP_CARGO_TINI_DISABLED is true", func() {
+			it.Before(func() {
+				Expect(os.Setenv("BP_CARGO_TINI_DISABLED", "true")).To(Succeed())
+			})
+
+			it.After(func() {
+				Expect(os.Unsetenv("BP_CARGO_TINI_DISABLED")).To(Succeed())
+			})
+
+			it("contributes cargo layer", func() {
+				ctx.Plan.Entries = append(ctx.Plan.Entries, libcnb.BuildpackPlanEntry{Name: "rust-cargo"})
+
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"app1", "app2", "app3"}, nil)
+
+				result, err := cargoBuild.Build(ctx)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(result.Layers).To(HaveLen(2))
+				Expect(result.Layers[0].Name()).To(Equal("Cargo Cache"))
+				Expect(result.Layers[1].Name()).To(Equal("Cargo"))
+
+				Expect(result.Processes).To(HaveLen(3))
+				Expect(result.Processes).To(ContainElement(
+					libcnb.Process{
+						Type:      "app1",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "app1"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   true,
+					}))
+				Expect(result.Processes).To(ContainElement(
+					libcnb.Process{
+						Type:      "app2",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "app2"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+				Expect(result.Processes).To(ContainElement(
+					libcnb.Process{
+						Type:      "app3",
+						Command:   filepath.Join(ctx.Application.Path, "bin", "app3"),
+						Arguments: []string{},
+						Direct:    true,
+						Default:   false,
+					}))
+
+				// TODO: BOM support isn't in yet
+				// Expect(result.BOM.Entries).To(HaveLen(1))
+				// Expect(result.BOM.Entries[0].Name).To(Equal("cargo"))
+				// Expect(result.BOM.Entries[0].Build).To(BeTrue())
+				// Expect(result.BOM.Entries[0].Launch).To(BeFalse())
+			})
 		})
 	})
 }
