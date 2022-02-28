@@ -93,16 +93,18 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					cargo.WithWorkspaceMembers("foo, bar"),
 					cargo.WithApplicationPath(ctx.Application.Path),
 					cargo.WithCargoService(service),
-					cargo.WithInstallArgs("--path=./todo --foo=bar --foo baz"))
+					cargo.WithInstallArgs("--path=./todo --foo=bar --foo baz"),
+					cargo.WithStack("foo-stack"))
 
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(r.LayerContributor.ExpectedMetadata).To(HaveLen(6))
+				Expect(r.LayerContributor.ExpectedMetadata).To(HaveLen(7))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("cargo-version", "1.2.3"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("rust-version", "1.2.3"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("additional-arguments", "--path=./todo --foo=bar --foo baz"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("test", "expected-val"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("workspace-members", "foo, bar"))
+				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("stack", "foo-stack"))
 				// can't reliably check hash value because it differs every time due to temp path changing on every test run
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKey("files"))
 				Expect(r.LayerContributor.ExpectedMetadata.(map[string]interface{})["files"]).To(HaveLen(64))

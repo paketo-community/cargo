@@ -30,6 +30,7 @@ import (
 	"github.com/buildpacks/libcnb"
 	"github.com/paketo-community/cargo/runner"
 
+	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/effect"
 	"github.com/paketo-buildpacks/libpak/effect/mocks"
@@ -179,6 +180,26 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 			Expect(runner.AddDefaultPath([]string{"install"}, ".")).To(Equal([]string{"install", "--path=."}))
 			Expect(runner.AddDefaultPath([]string{"install", "--foo=bar"}, ".")).To(Equal([]string{"install", "--foo=bar", "--path=."}))
 			Expect(runner.AddDefaultPath([]string{"install", "--foo", "bar"}, ".")).To(Equal([]string{"install", "--foo", "bar", "--path=."}))
+		})
+	})
+
+	context("set default --target argument", func() {
+		it("is specified by the user", func() {
+			Expect(runner.AddDefaultTargetForTiny([]string{"install", "--target"}, "foo")).To(Equal([]string{"install", "--target"}))
+			Expect(runner.AddDefaultTargetForTiny([]string{"install", "--target=test"}, "foo")).To(Equal([]string{"install", "--target=test"}))
+			Expect(runner.AddDefaultTargetForTiny([]string{"install", "--target", "test"}, "foo")).To(Equal([]string{"install", "--target", "test"}))
+		})
+
+		it("is not the tiny stack so no args are added", func() {
+			Expect(runner.AddDefaultTargetForTiny([]string{"install"}, "foo")).To(Equal([]string{"install"}))
+			Expect(runner.AddDefaultTargetForTiny([]string{"install", "--foo=bar"}, "foo")).To(Equal([]string{"install", "--foo=bar"}))
+			Expect(runner.AddDefaultTargetForTiny([]string{"install", "--foo", "bar"}, "foo")).To(Equal([]string{"install", "--foo", "bar"}))
+		})
+
+		it("is the tiny stack so default args are added", func() {
+			Expect(runner.AddDefaultTargetForTiny([]string{"install"}, libpak.TinyStackID)).To(Equal([]string{"install", "--target=x86_64-unknown-linux-musl"}))
+			Expect(runner.AddDefaultTargetForTiny([]string{"install", "--foo=bar"}, libpak.TinyStackID)).To(Equal([]string{"install", "--foo=bar", "--target=x86_64-unknown-linux-musl"}))
+			Expect(runner.AddDefaultTargetForTiny([]string{"install", "--foo", "bar"}, libpak.TinyStackID)).To(Equal([]string{"install", "--foo", "bar", "--target=x86_64-unknown-linux-musl"}))
 		})
 	})
 
