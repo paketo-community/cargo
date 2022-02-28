@@ -27,6 +27,7 @@ import (
 
 	"github.com/buildpacks/libcnb"
 	"github.com/mattn/go-shellwords"
+	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/effect"
 	"github.com/paketo-buildpacks/libpak/sherpa"
@@ -80,10 +81,18 @@ func WithExecutor(executor effect.Executor) Option {
 	}
 }
 
-// WithLogger sets addition args to pass to cargo install
+// WithLogger sets additional args to pass to cargo install
 func WithLogger(logger bard.Logger) Option {
 	return func(runner CargoRunner) CargoRunner {
 		runner.Logger = logger
+		return runner
+	}
+}
+
+// WithStack sets the stack on which we're running
+func WithStack(stack string) Option {
+	return func(runner CargoRunner) CargoRunner {
+		runner.Stack = stack
 		return runner
 	}
 }
@@ -95,6 +104,7 @@ type CargoRunner struct {
 	CargoInstallArgs      string
 	Executor              effect.Executor
 	Logger                bard.Logger
+	Stack                 string
 }
 
 type metadataTarget struct {
@@ -335,6 +345,7 @@ func (c CargoRunner) BuildArgs(destLayer libcnb.Layer, defaultMemberPath string)
 	args = append(args, envArgs...)
 	args = append(args, "--color=never", fmt.Sprintf("--root=%s", destLayer.Path))
 	args = AddDefaultPath(args, defaultMemberPath)
+	args = AddDefaultTargetForTiny(args, c.Stack)
 
 	return args, nil
 }
@@ -374,6 +385,21 @@ func AddDefaultPath(args []string, defaultMemberPath string) []string {
 		}
 	}
 	return append(args, fmt.Sprintf("--path=%s", defaultMemberPath))
+}
+
+// AddDefaultTargetForTiny will add --target=x86_64-unknown-linux-musl if the stack is Tiny and a `--target` is not already set
+func AddDefaultTargetForTiny(args []string, stack string) []string {
+	if stack != libpak.TinyStackID {
+		return args
+	}
+
+	for _, arg := range args {
+		if arg == "--target" || strings.HasPrefix(arg, "--target=") {
+			return args
+		}
+	}
+
+	return append(args, "--target=x86_64-unknown-linux-musl")
 }
 
 // AsBOMEntry creates BOM entries from cargo dependencies

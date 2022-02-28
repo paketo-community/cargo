@@ -98,6 +98,14 @@ func WithExcludeFolders(f []string) Option {
 	}
 }
 
+// WithStack sets logger
+func WithStack(stack string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.Stack = stack
+		return cargo
+	}
+}
+
 type Cargo struct {
 	AdditionalMetadata map[string]interface{}
 	ApplicationPath    string
@@ -108,6 +116,7 @@ type Cargo struct {
 	LayerContributor   libpak.LayerContributor
 	Logger             bard.Logger
 	ExcludeFolders     []string
+	Stack              string
 	WorkspaceMembers   string
 }
 
@@ -122,6 +131,7 @@ func NewCargo(options ...Option) (Cargo, error) {
 	metadata := map[string]interface{}{
 		"additional-arguments": cargo.InstallArgs,
 		"workspace-members":    cargo.WorkspaceMembers,
+		"stack":                cargo.Stack,
 	}
 
 	var err error

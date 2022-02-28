@@ -92,7 +92,8 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 				runner.WithCargoWorkspaceMembers(cargoWorkspaceMembers),
 				runner.WithCargoInstallArgs(cargoInstallArgs),
 				runner.WithExecutor(effect.NewExecutor()),
-				runner.WithLogger(b.Logger))
+				runner.WithLogger(b.Logger),
+				runner.WithStack(context.StackID))
 		}
 
 		cache := Cache{
@@ -107,7 +108,8 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			WithApplicationPath(context.Application.Path),
 			WithLogger(b.Logger),
 			WithCargoService(service),
-			WithExcludeFolders(excludeFolders))
+			WithExcludeFolders(excludeFolders),
+			WithStack(context.StackID))
 		if err != nil {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create cargo layer contributor\n%w", err)
 		}
