@@ -84,6 +84,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 						{Name: "rust-cargo"},
 					},
 					Requires: []libcnb.BuildPlanRequire{
+						{Name: "syft"},
 						{Name: "rust-cargo"},
 						{Name: "rust"},
 					},

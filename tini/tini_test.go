@@ -54,7 +54,7 @@ func testTini(t *testing.T, context spec.G, it spec.S) {
 		}
 		dc := libpak.DependencyCache{CachePath: "testdata"}
 
-		d, _ := tini.NewTini(dep, dc)
+		d := tini.NewTini(dep, dc)
 		layer, err := ctx.Layers.Layer("test-layer")
 		Expect(err).NotTo(HaveOccurred())
 

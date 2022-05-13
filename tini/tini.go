@@ -32,11 +32,11 @@ type Tini struct {
 	Logger           bard.Logger
 }
 
-func NewTini(dependency libpak.BuildpackDependency, cache libpak.DependencyCache) (Tini, libcnb.BOMEntry) {
-	contributor, entry := libpak.NewDependencyLayer(dependency, cache, libcnb.LayerTypes{
+func NewTini(dependency libpak.BuildpackDependency, cache libpak.DependencyCache) Tini {
+	contributor := libpak.NewDependencyLayerContributor(dependency, cache, libcnb.LayerTypes{
 		Launch: true,
 	})
-	return Tini{LayerContributor: contributor}, entry
+	return Tini{LayerContributor: contributor}
 }
 
 func (d Tini) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {

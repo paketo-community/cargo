@@ -26,6 +26,7 @@ import (
 	"github.com/buildpacks/libcnb"
 	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
+	"github.com/paketo-buildpacks/libpak/sbom"
 	"github.com/paketo-buildpacks/libpak/sherpa"
 	"github.com/paketo-community/cargo/mtimes"
 	"github.com/paketo-community/cargo/runner"
@@ -50,10 +51,10 @@ func WithWorkspaceMembers(ap string) Option {
 	}
 }
 
-// WithBOM sets libcnb.BOM
-func WithBOM(bom *libcnb.BOM) Option {
+// WithSBOMScanner sets workspace members
+func WithSBOMScanner(sc sbom.SBOMScanner) Option {
 	return func(cargo Cargo) Cargo {
-		cargo.BOM = bom
+		cargo.SBOMScanner = sc
 		return cargo
 	}
 }
@@ -109,13 +110,13 @@ func WithStack(stack string) Option {
 type Cargo struct {
 	AdditionalMetadata map[string]interface{}
 	ApplicationPath    string
-	BOM                *libcnb.BOM
 	Cache              Cache
-	InstallArgs        string
 	CargoService       runner.CargoService
+	ExcludeFolders     []string
+	InstallArgs        string
 	LayerContributor   libpak.LayerContributor
 	Logger             bard.Logger
-	ExcludeFolders     []string
+	SBOMScanner        sbom.SBOMScanner
 	Stack              string
 	WorkspaceMembers   string
 }
@@ -220,19 +221,15 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 			return libcnb.Layer{}, fmt.Errorf("unable to preserve all\n%w", err)
 		}
 
+		if err := c.SBOMScanner.ScanBuild(c.ApplicationPath, libcnb.CycloneDXJSON, libcnb.SyftJSON); err != nil {
+			return libcnb.Layer{}, fmt.Errorf("unable to create Build SBoM \n%w", err)
+		}
+
 		return layer, nil
 	})
 	if err != nil {
 		return libcnb.Layer{}, fmt.Errorf("unable to contribute application layer\n%w", err)
 	}
-
-	// TODO: Add BOM stuff, cargoService needs to do this & extract from Cargo.toml
-	// entry, err := c.Cache.AsBOMEntry()
-	// if err != nil {
-	// 	return libcnb.Layer{}, fmt.Errorf("unable to generate build dependencies\n%w", err)
-	// }
-	// entry.Metadata["layer"] = c.Cache.Name()
-	// c.BOM.Entries = append(c.BOM.Entries, entry)
 
 	c.Logger.Header("Removing source code")
 	fs, err := ioutil.ReadDir(c.ApplicationPath)

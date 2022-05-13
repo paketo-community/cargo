@@ -26,6 +26,7 @@ import (
 
 const (
 	PlanEntryRustCargo = "rust-cargo"
+	PlanEntrySyft      = "syft"
 )
 
 type Detect struct {
@@ -49,6 +50,7 @@ func (d Detect) Detect(context libcnb.DetectContext) (libcnb.DetectResult, error
 					{Name: PlanEntryRustCargo},
 				},
 				Requires: []libcnb.BuildPlanRequire{
+					{Name: PlanEntrySyft},
 					{Name: PlanEntryRustCargo},
 					{Name: "rust"},
 				},

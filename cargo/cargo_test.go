@@ -27,6 +27,7 @@ import (
 	"github.com/buildpacks/libcnb"
 	. "github.com/onsi/gomega"
 	"github.com/paketo-buildpacks/libpak/bard"
+	sbomMocks "github.com/paketo-buildpacks/libpak/sbom/mocks"
 	"github.com/paketo-community/cargo/cargo"
 	"github.com/paketo-community/cargo/runner/mocks"
 	"github.com/sclevine/spec"
@@ -37,10 +38,11 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect = NewWithT(t).Expect
 
-		ctx       libcnb.BuildContext
-		service   *mocks.CargoService
-		cargoHome string
-		logger    bard.Logger
+		ctx         libcnb.BuildContext
+		service     *mocks.CargoService
+		cargoHome   string
+		logger      bard.Logger
+		sbomScanner *sbomMocks.SBOMScanner
 	)
 
 	it.Before(func() {
@@ -59,6 +61,9 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 		logger = bard.NewLogger(io.Discard)
 
 		service = &mocks.CargoService{}
+
+		sbomScanner = &sbomMocks.SBOMScanner{}
+		sbomScanner.On("ScanBuild", ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
 	})
 
 	it.After(func() {
@@ -94,7 +99,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					cargo.WithApplicationPath(ctx.Application.Path),
 					cargo.WithCargoService(service),
 					cargo.WithInstallArgs("--path=./todo --foo=bar --foo baz"),
-					cargo.WithStack("foo-stack"))
+					cargo.WithStack("foo-stack"),
+					cargo.WithSBOMScanner(sbomScanner))
 
 				Expect(err).ToNot(HaveOccurred())
 
@@ -117,7 +123,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				r, err := cargo.NewCargo(
 					cargo.WithApplicationPath(ctx.Application.Path),
-					cargo.WithCargoService(service))
+					cargo.WithCargoService(service),
+					cargo.WithSBOMScanner(sbomScanner))
 				Expect(err).ToNot(HaveOccurred())
 
 				procs, err := r.BuildProcessTypes(false)
@@ -155,7 +162,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				r, err := cargo.NewCargo(
 					cargo.WithApplicationPath(ctx.Application.Path),
-					cargo.WithCargoService(service))
+					cargo.WithCargoService(service),
+					cargo.WithSBOMScanner(sbomScanner))
 				Expect(err).ToNot(HaveOccurred())
 
 				procs, err := r.BuildProcessTypes(false)
@@ -201,7 +209,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				r, err := cargo.NewCargo(
 					cargo.WithApplicationPath(ctx.Application.Path),
-					cargo.WithCargoService(service))
+					cargo.WithCargoService(service),
+					cargo.WithSBOMScanner(sbomScanner))
 				Expect(err).ToNot(HaveOccurred())
 
 				procs, err := r.BuildProcessTypes(true)
@@ -252,7 +261,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				c, err = cargo.NewCargo(
 					cargo.WithApplicationPath(ctx.Application.Path),
-					cargo.WithCargoService(service))
+					cargo.WithCargoService(service),
+					cargo.WithSBOMScanner(sbomScanner))
 
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -486,7 +496,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				c, err = cargo.NewCargo(
 					cargo.WithApplicationPath(ctx.Application.Path),
 					cargo.WithCargoService(service),
-					cargo.WithExcludeFolders([]string{"static", "templates"}))
+					cargo.WithExcludeFolders([]string{"static", "templates"}),
+					cargo.WithSBOMScanner(sbomScanner))
 
 				Expect(err).ToNot(HaveOccurred())
 			})

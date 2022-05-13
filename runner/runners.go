@@ -33,7 +33,7 @@ import (
 	"github.com/paketo-buildpacks/libpak/sherpa"
 )
 
-//go:generate mockery -name CargoService -case=underscore
+//go:generate mockery --name CargoService --case underscore
 
 type CargoService interface {
 	Install(srcDir string, destLayer libcnb.Layer) error
@@ -43,7 +43,6 @@ type CargoService interface {
 	CleanCargoHomeCache() error
 	CargoVersion() (string, error)
 	RustVersion() (string, error)
-	AsBOMEntry() (libcnb.BOMEntry, error)
 }
 
 // Option is a function for configuring a CargoRunner
@@ -400,18 +399,6 @@ func AddDefaultTargetForTiny(args []string, stack string) []string {
 	}
 
 	return append(args, "--target=x86_64-unknown-linux-musl")
-}
-
-// AsBOMEntry creates BOM entries from cargo dependencies
-func (c CargoRunner) AsBOMEntry() (libcnb.BOMEntry, error) {
-	// TODO: read through cargo manifest and dump dependencies
-	//   libbs is using `libjvm.NewMavenJARListing(c.Path)`
-
-	return libcnb.BOMEntry{
-		Name:     "build-dependencies",
-		Metadata: map[string]interface{}{"dependencies": "TODO"},
-		Build:    true,
-	}, nil
 }
 
 func (c CargoRunner) fetchCargoMetadata(srcDir string) (metadata, error) {
