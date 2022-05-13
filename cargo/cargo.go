@@ -216,13 +216,13 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 			}
 		}
 
+		if err := c.SBOMScanner.ScanLayer(layer, c.ApplicationPath, libcnb.CycloneDXJSON, libcnb.SyftJSON); err != nil {
+			return libcnb.Layer{}, fmt.Errorf("unable to create layer %s SBoM \n%w", layer.Name, err)
+		}
+
 		err = preserver.PreserveAll(targetPath, cargoHome, layer.Path)
 		if err != nil {
 			return libcnb.Layer{}, fmt.Errorf("unable to preserve all\n%w", err)
-		}
-
-		if err := c.SBOMScanner.ScanBuild(c.ApplicationPath, libcnb.CycloneDXJSON, libcnb.SyftJSON); err != nil {
-			return libcnb.Layer{}, fmt.Errorf("unable to create Build SBoM \n%w", err)
 		}
 
 		return layer, nil

@@ -63,7 +63,6 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 		service = &mocks.CargoService{}
 
 		sbomScanner = &sbomMocks.SBOMScanner{}
-		sbomScanner.On("ScanBuild", ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
 	})
 
 	it.After(func() {
@@ -280,6 +279,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				inputLayer, err := ctx.Layers.Layer("cargo-layer")
 				Expect(err).ToNot(HaveOccurred())
 
+				sbomScanner.On("ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
+
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -320,6 +321,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				inputLayer, err := ctx.Layers.Layer("cargo-layer")
 				Expect(err).ToNot(HaveOccurred())
+
+				sbomScanner.On("ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
 
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
@@ -367,6 +370,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					inputLayer, err := ctx.Layers.Layer("cargo-layer")
 					Expect(err).ToNot(HaveOccurred())
 
+					sbomScanner.On("ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
+
 					outputLayer, err := c.Contribute(inputLayer)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -410,6 +415,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				inputLayer, err := ctx.Layers.Layer("cargo-layer")
 				Expect(err).ToNot(HaveOccurred())
+
+				sbomScanner.On("ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
 
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
@@ -518,6 +525,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				inputLayer, err := ctx.Layers.Layer("cargo-layer")
 				Expect(err).ToNot(HaveOccurred())
+
+				sbomScanner.On("ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
 
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
