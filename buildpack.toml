@@ -55,6 +55,12 @@ api = "0.7"
     description = "Skip installing tini"
     name = "BP_CARGO_TINI_DISABLED"
 
+  [[metadata.configurations]]
+    build = true
+    default = "false"
+    description = "Skip running SBOM scan"
+    name = "BP_DISABLE_SBOM"
+
   [[metadata.dependencies]]
     cpes = ["cpe:2.3:a:tini_project:tini:0.19.0:*:*:*:*:*:*:*"]
     id = "tini"
