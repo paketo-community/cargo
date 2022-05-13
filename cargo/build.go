@@ -24,6 +24,7 @@ import (
 	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/effect"
+	"github.com/paketo-buildpacks/libpak/sbom"
 	"github.com/paketo-community/cargo/runner"
 	"github.com/paketo-community/cargo/tini"
 )
@@ -65,9 +66,8 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 				return libcnb.BuildResult{}, fmt.Errorf("unable to find dependency\n%w", err)
 			}
 
-			tini, be := tini.NewTini(dep, dc)
+			tini := tini.NewTini(dep, dc)
 			tini.Logger = b.Logger
-			result.BOM.Entries = append(result.BOM.Entries, be)
 			result.Layers = append(result.Layers, tini)
 		}
 
@@ -102,14 +102,17 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 		}
 		result.Layers = append(result.Layers, cache)
 
+		sbomScanner := sbom.NewSyftCLISBOMScanner(context.Layers, effect.NewExecutor(), b.Logger)
+
 		cargoLayer, err := NewCargo(
-			WithInstallArgs(cargoInstallArgs),
-			WithWorkspaceMembers(cargoWorkspaceMembers),
 			WithApplicationPath(context.Application.Path),
-			WithLogger(b.Logger),
 			WithCargoService(service),
 			WithExcludeFolders(excludeFolders),
-			WithStack(context.StackID))
+			WithInstallArgs(cargoInstallArgs),
+			WithLogger(b.Logger),
+			WithSBOMScanner(sbomScanner),
+			WithStack(context.StackID),
+			WithWorkspaceMembers(cargoWorkspaceMembers))
 		if err != nil {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create cargo layer contributor\n%w", err)
 		}
@@ -120,8 +123,6 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 		}
 
 		result.Layers = append(result.Layers, cargoLayer)
-		// TODO: BOM support for Cargo
-		// result.BOM.Entries = append(result.BOM.Entries, cargoBOM)
 	}
 
 	return result, nil
