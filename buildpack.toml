@@ -18,7 +18,7 @@ api = "0.6"
 
   [[metadata.configurations]]
     build = true
-    default = ""
+    default = "--locked"
     description = "additional arguments to pass to Cargo install"
     name = "BP_CARGO_INSTALL_ARGS"
 
