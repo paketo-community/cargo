@@ -201,5 +201,71 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 					}))
 			})
 		})
+
+		context("BP_DISABLE_SBOM is true", func() {
+			it.Before(func() {
+				Expect(os.Setenv("BP_DISABLE_SBOM", "true")).To(Succeed())
+			})
+
+			it.After(func() {
+				Expect(os.Unsetenv("BP_DISABLE_SBOM")).To(Succeed())
+			})
+
+			it.Focus("contributes cargo layer", func() {
+				ctx.Plan.Entries = append(ctx.Plan.Entries, libcnb.BuildpackPlanEntry{Name: "rust-cargo"})
+
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"app1", "app2", "app3"}, nil)
+
+				result, err := cargoBuild.Build(ctx)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(result.Labels).To(HaveLen(1))
+				Expect(result.Labels[0].Key).To(Equal("io.paketo.sbom.disabled"))
+				Expect(result.Labels[0].Value).To(Equal("true"))
+
+				Expect(result.Layers).To(HaveLen(3))
+				Expect(result.Layers[0].Name()).To(Equal("tini"))
+				Expect(result.Layers[1].Name()).To(Equal("Cargo Cache"))
+				Expect(result.Layers[2].Name()).To(Equal("Cargo"))
+
+				Expect(result.Processes).To(HaveLen(3))
+				Expect(result.Processes).To(ContainElement(
+					libcnb.Process{
+						Type:    "app1",
+						Command: "tini",
+						Arguments: []string{
+							"-g",
+							"--",
+							filepath.Join(ctx.Application.Path, "bin", "app1"),
+						},
+						Direct:  true,
+						Default: true,
+					}))
+				Expect(result.Processes).To(ContainElement(
+					libcnb.Process{
+						Type:    "app2",
+						Command: "tini",
+						Arguments: []string{
+							"-g",
+							"--",
+							filepath.Join(ctx.Application.Path, "bin", "app2"),
+						},
+						Direct:  true,
+						Default: false,
+					}))
+				Expect(result.Processes).To(ContainElement(
+					libcnb.Process{
+						Type:    "app3",
+						Command: "tini",
+						Arguments: []string{
+							"-g",
+							"--",
+							filepath.Join(ctx.Application.Path, "bin", "app3"),
+						},
+						Direct:  true,
+						Default: false,
+					}))
+			})
+		})
 	})
 }

@@ -261,7 +261,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				c, err = cargo.NewCargo(
 					cargo.WithApplicationPath(ctx.Application.Path),
 					cargo.WithCargoService(service),
-					cargo.WithSBOMScanner(sbomScanner))
+					cargo.WithSBOMScanner(sbomScanner),
+					cargo.WithRunSBOMScan(true))
 
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -283,6 +284,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
+
+				sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
@@ -326,6 +329,53 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
+
+				sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
+
+				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
+				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
+				Expect(outputLayer.LayerTypes.Launch).To(BeTrue())
+
+				// app files should be deleted
+				Expect(appFile).ToNot(BeAnExistingFile())
+
+				// preserver should have run
+				Expect(filepath.Join(outputLayer.Path, "mtimes.json")).To(BeARegularFile())
+				Expect(filepath.Join(cargoHome, "mtimes.json")).To(BeARegularFile())
+				Expect(filepath.Join(cacheLayer.Path, "mtimes.json")).To(BeARegularFile())
+
+				// we should have two copies of the binary, one in the layer an one in the app root
+				Expect(filepath.Join(outputLayer.Path, "bin", "my-binary")).To(BeARegularFile())
+				Expect(filepath.Join(ctx.Application.Path, "bin", "my-binary")).To(BeARegularFile())
+				Expect(filepath.Join(ctx.Application.Path, "mtimes.json")).ToNot(BeARegularFile())
+
+				// Ensure `/workspace/bin` is added to the PATH at launch
+				Expect(outputLayer.LaunchEnvironment["PATH.append"]).To(Equal(filepath.Join(ctx.Application.Path, "bin")))
+			})
+
+			it("contributes cargo layer with one member without SBOM", func() {
+				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{
+					{Scheme: "file", Path: filepath.Join(ctx.Application.Path)},
+				}, nil)
+
+				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
+					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
+					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					Expect(err).ToNot(HaveOccurred())
+					return nil
+				})
+
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"my-binary", "other"}, nil)
+
+				inputLayer, err := ctx.Layers.Layer("cargo-layer")
+				Expect(err).ToNot(HaveOccurred())
+
+				c.RunSBOMScan = false
+
+				outputLayer, err := c.Contribute(inputLayer)
+				Expect(err).NotTo(HaveOccurred())
+
+				sbomScanner.AssertNotCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
@@ -375,6 +425,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					outputLayer, err := c.Contribute(inputLayer)
 					Expect(err).NotTo(HaveOccurred())
 
+					sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
+
 					Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 					Expect(outputLayer.LayerTypes.Build).To(BeFalse())
 					Expect(outputLayer.LayerTypes.Launch).To(BeTrue())
@@ -420,6 +472,8 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
+
+				sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())

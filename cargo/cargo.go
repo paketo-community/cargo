@@ -51,6 +51,14 @@ func WithWorkspaceMembers(ap string) Option {
 	}
 }
 
+// WithRunSBOMScan sets workspace members
+func WithRunSBOMScan(sc bool) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.RunSBOMScan = sc
+		return cargo
+	}
+}
+
 // WithSBOMScanner sets workspace members
 func WithSBOMScanner(sc sbom.SBOMScanner) Option {
 	return func(cargo Cargo) Cargo {
@@ -116,6 +124,7 @@ type Cargo struct {
 	InstallArgs        string
 	LayerContributor   libpak.LayerContributor
 	Logger             bard.Logger
+	RunSBOMScan        bool
 	SBOMScanner        sbom.SBOMScanner
 	Stack              string
 	WorkspaceMembers   string
@@ -216,8 +225,10 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 			}
 		}
 
-		if err := c.SBOMScanner.ScanLayer(layer, c.ApplicationPath, libcnb.CycloneDXJSON, libcnb.SyftJSON); err != nil {
-			return libcnb.Layer{}, fmt.Errorf("unable to create layer %s SBoM \n%w", layer.Name, err)
+		if c.RunSBOMScan {
+			if err := c.SBOMScanner.ScanLayer(layer, c.ApplicationPath, libcnb.CycloneDXJSON, libcnb.SyftJSON); err != nil {
+				return libcnb.Layer{}, fmt.Errorf("unable to create layer %s SBoM \n%w", layer.Name, err)
+			}
 		}
 
 		err = preserver.PreserveAll(targetPath, cargoHome, layer.Path)

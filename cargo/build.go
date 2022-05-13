@@ -84,6 +84,7 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 
 		cargoWorkspaceMembers, _ := cr.Resolve("BP_CARGO_WORKSPACE_MEMBERS")
 		cargoInstallArgs, _ := cr.Resolve("BP_CARGO_INSTALL_ARGS")
+		skipSBOMScan := cr.ResolveBool("BP_DISABLE_SBOM")
 
 		service := b.CargoService
 		if service == nil {
@@ -110,6 +111,7 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			WithExcludeFolders(excludeFolders),
 			WithInstallArgs(cargoInstallArgs),
 			WithLogger(b.Logger),
+			WithRunSBOMScan(!skipSBOMScan),
 			WithSBOMScanner(sbomScanner),
 			WithStack(context.StackID),
 			WithWorkspaceMembers(cargoWorkspaceMembers))
@@ -123,6 +125,10 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 		}
 
 		result.Layers = append(result.Layers, cargoLayer)
+
+		if skipSBOMScan {
+			result.Labels = append(result.Labels, libcnb.Label{Key: "io.paketo.sbom.disabled", Value: "true"})
+		}
 	}
 
 	return result, nil
