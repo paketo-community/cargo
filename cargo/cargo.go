@@ -35,6 +35,14 @@ import (
 // Option is a function for configuring a Cargo
 type Option func(cargo Cargo) Cargo
 
+// WithAdditionalMetadata sets additional metadata to include
+func WithAdditionalMetadata(metadata map[string]interface{}) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.AdditionalMetadata = metadata
+		return cargo
+	}
+}
+
 // WithApplicationPath sets app path
 func WithApplicationPath(ap string) Option {
 	return func(cargo Cargo) Cargo {
@@ -43,10 +51,34 @@ func WithApplicationPath(ap string) Option {
 	}
 }
 
-// WithWorkspaceMembers sets workspace members
-func WithWorkspaceMembers(ap string) Option {
+// WithCargoService sets cargo service
+func WithCargoService(s runner.CargoService) Option {
 	return func(cargo Cargo) Cargo {
-		cargo.WorkspaceMembers = ap
+		cargo.CargoService = s
+		return cargo
+	}
+}
+
+// WithExcludeFolders sets logger
+func WithExcludeFolders(f []string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.ExcludeFolders = f
+		return cargo
+	}
+}
+
+// WithInstallArgs sets install args
+func WithInstallArgs(args string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.InstallArgs = args
+		return cargo
+	}
+}
+
+// WithLogger sets logger
+func WithLogger(l bard.Logger) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.Logger = l
 		return cargo
 	}
 }
@@ -67,50 +99,34 @@ func WithSBOMScanner(sc sbom.SBOMScanner) Option {
 	}
 }
 
-// WithAdditionalMetadata sets additional metadata to include
-func WithAdditionalMetadata(metadata map[string]interface{}) Option {
-	return func(cargo Cargo) Cargo {
-		cargo.AdditionalMetadata = metadata
-		return cargo
-	}
-}
-
-// WithInstallArgs sets install args
-func WithInstallArgs(args string) Option {
-	return func(cargo Cargo) Cargo {
-		cargo.InstallArgs = args
-		return cargo
-	}
-}
-
-// WithCargoService sets cargo service
-func WithCargoService(s runner.CargoService) Option {
-	return func(cargo Cargo) Cargo {
-		cargo.CargoService = s
-		return cargo
-	}
-}
-
-// WithLogger sets logger
-func WithLogger(l bard.Logger) Option {
-	return func(cargo Cargo) Cargo {
-		cargo.Logger = l
-		return cargo
-	}
-}
-
-// WithExcludeFolders sets logger
-func WithExcludeFolders(f []string) Option {
-	return func(cargo Cargo) Cargo {
-		cargo.ExcludeFolders = f
-		return cargo
-	}
-}
-
 // WithStack sets logger
 func WithStack(stack string) Option {
 	return func(cargo Cargo) Cargo {
 		cargo.Stack = stack
+		return cargo
+	}
+}
+
+// WithTools sets logger
+func WithTools(tools []string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.Tools = tools
+		return cargo
+	}
+}
+
+// WithToolsArgs sets logger
+func WithToolsArgs(toolsArgs []string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.ToolsArgs = toolsArgs
+		return cargo
+	}
+}
+
+// WithWorkspaceMembers sets workspace members
+func WithWorkspaceMembers(ap string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.WorkspaceMembers = ap
 		return cargo
 	}
 }
@@ -127,6 +143,8 @@ type Cargo struct {
 	RunSBOMScan        bool
 	SBOMScanner        sbom.SBOMScanner
 	Stack              string
+	Tools              []string
+	ToolsArgs          []string
 	WorkspaceMembers   string
 }
 
@@ -140,8 +158,10 @@ func NewCargo(options ...Option) (Cargo, error) {
 
 	metadata := map[string]interface{}{
 		"additional-arguments": cargo.InstallArgs,
-		"workspace-members":    cargo.WorkspaceMembers,
 		"stack":                cargo.Stack,
+		"tools":                cargo.Tools,
+		"tools-args":           cargo.ToolsArgs,
+		"workspace-members":    cargo.WorkspaceMembers,
 	}
 
 	var err error
@@ -190,6 +210,12 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 		err = preserver.RestoreAll(targetPath, cargoHome, layer.Path)
 		if err != nil {
 			return libcnb.Layer{}, fmt.Errorf("unable to restore all\n%w", err)
+		}
+
+		for _, tool := range c.Tools {
+			if err := c.CargoService.InstallTool(tool, c.ToolsArgs); err != nil {
+				return libcnb.Layer{}, fmt.Errorf("unable to install tool %s with args %v\n%w", tool, c.ToolsArgs, err)
+			}
 		}
 
 		members, err := c.CargoService.WorkspaceMembers(c.ApplicationPath, layer)

@@ -38,6 +38,7 @@ import (
 type CargoService interface {
 	Install(srcDir string, destLayer libcnb.Layer) error
 	InstallMember(memberPath string, srcDir string, destLayer libcnb.Layer) error
+	InstallTool(name string, additionalArgs []string) error
 	WorkspaceMembers(srcDir string, destLayer libcnb.Layer) ([]url.URL, error)
 	ProjectTargets(srcDir string) ([]string, error)
 	CleanCargoHomeCache() error
@@ -175,6 +176,23 @@ func (c CargoRunner) InstallMember(memberPath string, srcDir string, destLayer l
 	if err != nil {
 		return fmt.Errorf("unable to cleanup: %w", err)
 	}
+	return nil
+}
+
+func (c CargoRunner) InstallTool(name string, additionalArgs []string) error {
+	args := []string{"install", name}
+	args = append(args, additionalArgs...)
+
+	c.Logger.Bodyf("cargo %s", strings.Join(args, " "))
+	if err := c.Executor.Execute(effect.Execution{
+		Command: "cargo",
+		Args:    args,
+		Stdout:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
+		Stderr:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
+	}); err != nil {
+		return fmt.Errorf("unable to install tool\n%w", err)
+	}
+
 	return nil
 }
 

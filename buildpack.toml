@@ -33,6 +33,18 @@ api = "0.7"
 
   [[metadata.configurations]]
     build = true
+    default = ""
+    description = "additional tools to be add with Cargo install"
+    name = "BP_CARGO_INSTALL_TOOLS"
+  
+  [[metadata.configurations]]
+    build = true
+    default = ""
+    description = "additional arguments to pass to Cargo install for tools"
+    name = "BP_CARGO_INSTALL_TOOLS_ARGS"
+
+  [[metadata.configurations]]
+    build = true
     default = "--locked"
     description = "additional arguments to pass to Cargo install"
     name = "BP_CARGO_INSTALL_ARGS"

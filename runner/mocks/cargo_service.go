@@ -77,6 +77,20 @@ func (_m *CargoService) InstallMember(memberPath string, srcDir string, destLaye
 	return r0
 }
 
+// InstallTool provides a mock function with given fields: name, additionalArgs
+func (_m *CargoService) InstallTool(name string, additionalArgs []string) error {
+	ret := _m.Called(name, additionalArgs)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, []string) error); ok {
+		r0 = rf(name, additionalArgs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ProjectTargets provides a mock function with given fields: srcDir
 func (_m *CargoService) ProjectTargets(srcDir string) ([]string, error) {
 	ret := _m.Called(srcDir)
