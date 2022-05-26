@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/buildpacks/libcnb"
+	"github.com/mattn/go-shellwords"
 	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/effect"
@@ -105,6 +106,18 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 
 		sbomScanner := sbom.NewSyftCLISBOMScanner(context.Layers, effect.NewExecutor(), b.Logger)
 
+		cargoToolsRaw, _ := cr.Resolve("BP_CARGO_INSTALL_TOOLS")
+		cargoTools, err := shellwords.Parse(cargoToolsRaw)
+		if err != nil {
+			return libcnb.BuildResult{}, fmt.Errorf("unable to parse BP_CARGO_INSTALL_TOOLS=%q\n%w", cargoToolsRaw, err)
+		}
+
+		cargoToolsArgsRaw, _ := cr.Resolve("BP_CARGO_INSTALL_TOOLS_ARGS")
+		cargoToolsArgs, err := shellwords.Parse(cargoToolsArgsRaw)
+		if err != nil {
+			return libcnb.BuildResult{}, fmt.Errorf("unable to parse BP_CARGO_INSTALL_TOOLS_ARGS=%q\n%w", cargoToolsArgsRaw, err)
+		}
+
 		cargoLayer, err := NewCargo(
 			WithApplicationPath(context.Application.Path),
 			WithCargoService(service),
@@ -114,6 +127,8 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			WithRunSBOMScan(!skipSBOMScan),
 			WithSBOMScanner(sbomScanner),
 			WithStack(context.StackID),
+			WithTools(cargoTools),
+			WithToolsArgs(cargoToolsArgs),
 			WithWorkspaceMembers(cargoWorkspaceMembers))
 		if err != nil {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to create cargo layer contributor\n%w", err)

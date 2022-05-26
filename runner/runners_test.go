@@ -148,6 +148,48 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 		})
 	})
 
+	context("cargo install tools", func() {
+		it("installs with no args", func() {
+			runner := runner.CargoRunner{
+				CargoHome: cargoHome,
+				Executor:  executor,
+			}
+
+			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
+				return reflect.DeepEqual(ex.Args, []string{"install", "foo"})
+			})).Return(nil)
+
+			err := runner.InstallTool("foo", []string{})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(executor.Calls).To(HaveLen(1))
+
+			e := executor.Calls[0].Arguments[0].(effect.Execution)
+			Expect(e.Command).To(Equal("cargo"))
+			Expect(e.Args).To(Equal([]string{"install", "foo"}))
+		})
+
+		it("installs with additional args", func() {
+			runner := runner.CargoRunner{
+				CargoHome: cargoHome,
+				Executor:  executor,
+			}
+
+			executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
+				return reflect.DeepEqual(ex.Args, []string{"install", "foo", "--bar", "--baz"})
+			})).Return(nil)
+
+			err := runner.InstallTool("foo", []string{"--bar", "--baz"})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(executor.Calls).To(HaveLen(1))
+
+			e := executor.Calls[0].Arguments[0].(effect.Execution)
+			Expect(e.Command).To(Equal("cargo"))
+			Expect(e.Args).To(Equal([]string{"install", "foo", "--bar", "--baz"}))
+		})
+	})
+
 	context("BP_CARGO_INSTALL_ARGS filters --color and --root", func() {
 		it("filters --root", func() {
 			Expect(runner.FilterInstallArgs("--root=somewhere")).To(BeEmpty())

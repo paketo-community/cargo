@@ -211,7 +211,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 				Expect(os.Unsetenv("BP_DISABLE_SBOM")).To(Succeed())
 			})
 
-			it.Focus("contributes cargo layer", func() {
+			it("contributes cargo layer", func() {
 				ctx.Plan.Entries = append(ctx.Plan.Entries, libcnb.BuildpackPlanEntry{Name: "rust-cargo"})
 
 				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"app1", "app2", "app3"}, nil)

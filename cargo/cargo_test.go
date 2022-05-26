@@ -99,16 +99,21 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					cargo.WithCargoService(service),
 					cargo.WithInstallArgs("--path=./todo --foo=bar --foo baz"),
 					cargo.WithStack("foo-stack"),
+					cargo.WithTools([]string{"foo-tool"}),
+					cargo.WithToolsArgs([]string{"--tool-arg"}),
 					cargo.WithSBOMScanner(sbomScanner))
 
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(r.LayerContributor.ExpectedMetadata).To(HaveLen(7))
+				Expect(r.LayerContributor.ExpectedMetadata).To(HaveLen(9))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("cargo-version", "1.2.3"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("rust-version", "1.2.3"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("additional-arguments", "--path=./todo --foo=bar --foo baz"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("test", "expected-val"))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("workspace-members", "foo, bar"))
+				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("stack", "foo-stack"))
+				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("tools", []string{"foo-tool"}))
+				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("tools-args", []string{"--tool-arg"}))
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKeyWithValue("stack", "foo-stack"))
 				// can't reliably check hash value because it differs every time due to temp path changing on every test run
 				Expect(r.LayerContributor.ExpectedMetadata).To(HaveKey("files"))
@@ -240,6 +245,57 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 						Direct:    true,
 						Default:   false,
 					}))
+			})
+		})
+
+		context("cargo tools", func() {
+			var (
+				c          cargo.Cargo
+				cacheLayer libcnb.Layer
+			)
+
+			it.Before(func() {
+				var err error
+
+				cache := cargo.Cache{AppPath: ctx.Application.Path, Logger: logger}
+				cacheLayer, err = ctx.Layers.Layer("cache-layer")
+				Expect(err).NotTo(HaveOccurred())
+				cacheLayer, err = cache.Contribute(cacheLayer)
+				Expect(err).NotTo(HaveOccurred())
+
+				c, err = cargo.NewCargo(
+					cargo.WithApplicationPath(ctx.Application.Path),
+					cargo.WithCargoService(service),
+					cargo.WithSBOMScanner(sbomScanner),
+					cargo.WithTools([]string{"foo-tool"}),
+					cargo.WithToolsArgs([]string{"--baz"}),
+					cargo.WithRunSBOMScan(true))
+
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			it("installs a tool", func() {
+				service.On("InstallTool", "foo-tool", []string{"--baz"}).Return(nil)
+				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{}, nil)
+				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
+					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
+					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					Expect(err).ToNot(HaveOccurred())
+					return nil
+				})
+				service.On("ProjectTargets", mock.AnythingOfType("string")).Return([]string{"my-binary"}, nil)
+
+				inputLayer, err := ctx.Layers.Layer("cargo-layer")
+				Expect(err).ToNot(HaveOccurred())
+
+				sbomScanner.On("ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON).Return(nil)
+
+				_, err = c.Contribute(inputLayer)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(service.Calls[2].Method).To(Equal("InstallTool"))
+				Expect(service.Calls[2].Arguments[0]).To(Equal("foo-tool"))
+				Expect(service.Calls[2].Arguments[1]).To(Equal([]string{"--baz"}))
 			})
 		})
 
