@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/buildpacks/libcnb"
+	"github.com/heroku/color"
 	"github.com/mattn/go-shellwords"
 	"github.com/paketo-buildpacks/libpak"
 	"github.com/paketo-buildpacks/libpak/bard"
@@ -77,11 +78,16 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 			return libcnb.BuildResult{}, fmt.Errorf("unable to locate cargo home")
 		}
 
-		excludeFoldersRaw, _ := cr.Resolve("BP_CARGO_EXCLUDE_FOLDERS")
-		var excludeFolders []string
-		for _, excludeFolder := range strings.Split(excludeFoldersRaw, ",") {
-			excludeFolders = append(excludeFolders, strings.TrimSpace(excludeFolder))
+		includeFolders, _ := cr.Resolve("BP_INCLUDE_FILES")
+
+		// Deprecated: to be removed before the cargo 1.0.0 release
+		deprecatedExcludeFolders, usedDeprecatedExclude := cr.Resolve("BP_CARGO_EXCLUDE_FOLDERS")
+		if usedDeprecatedExclude {
+			b.Logger.Infof("%s: `BP_CARGO_EXCLUDE_FOLDERS` has been deprecated and will be removed before the paketo-community/cargo 1.0 GA release. Use `BP_INCLUDE_FILES` instead.", color.YellowString("Warning"))
+			includeFolders = fmt.Sprintf("%s:%s", includeFolders, strings.ReplaceAll(deprecatedExcludeFolders, ",", ":"))
 		}
+
+		excludeFolders, _ := cr.Resolve("BP_EXCLUDE_FILES")
 
 		cargoWorkspaceMembers, _ := cr.Resolve("BP_CARGO_WORKSPACE_MEMBERS")
 		cargoInstallArgs, _ := cr.Resolve("BP_CARGO_INSTALL_ARGS")
@@ -121,6 +127,7 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 		cargoLayer, err := NewCargo(
 			WithApplicationPath(context.Application.Path),
 			WithCargoService(service),
+			WithIncludeFolders(includeFolders),
 			WithExcludeFolders(excludeFolders),
 			WithInstallArgs(cargoInstallArgs),
 			WithLogger(b.Logger),

@@ -57,9 +57,15 @@ api = "0.7"
 
   [[metadata.configurations]]
     build = true
-    default = "static, templates, public, html"
-    description = "folders that should not be deleted and should persist to the generated image"
-    name = "BP_CARGO_EXCLUDE_FOLDERS"
+    default = "static/*:templates/*:public/*:html/*"
+    description = "colon separated list of glob patterns, matched source files are included"
+    name = "BP_INCLUDE_FILES"
+
+  [[metadata.configurations]]
+    build = true
+    default = ""
+    description = "colon separated list of glob patterns, matched source files are removed"
+    name = "BP_EXCLUDE_FILES"
 
   [[metadata.configurations]]
     build = true

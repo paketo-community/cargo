@@ -18,7 +18,6 @@ package cargo
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +27,7 @@ import (
 	"github.com/paketo-buildpacks/libpak/bard"
 	"github.com/paketo-buildpacks/libpak/sbom"
 	"github.com/paketo-buildpacks/libpak/sherpa"
+	"github.com/paketo-buildpacks/source-removal/logic"
 	"github.com/paketo-community/cargo/mtimes"
 	"github.com/paketo-community/cargo/runner"
 )
@@ -59,8 +59,16 @@ func WithCargoService(s runner.CargoService) Option {
 	}
 }
 
+// WithIncludeFolders sets logger
+func WithIncludeFolders(f string) Option {
+	return func(cargo Cargo) Cargo {
+		cargo.IncludeFolders = f
+		return cargo
+	}
+}
+
 // WithExcludeFolders sets logger
-func WithExcludeFolders(f []string) Option {
+func WithExcludeFolders(f string) Option {
 	return func(cargo Cargo) Cargo {
 		cargo.ExcludeFolders = f
 		return cargo
@@ -136,7 +144,8 @@ type Cargo struct {
 	ApplicationPath    string
 	Cache              Cache
 	CargoService       runner.CargoService
-	ExcludeFolders     []string
+	IncludeFolders     string
+	ExcludeFolders     string
 	InstallArgs        string
 	LayerContributor   libpak.LayerContributor
 	Logger             bard.Logger
@@ -272,23 +281,14 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 	}
 
 	c.Logger.Header("Removing source code")
-	fs, err := ioutil.ReadDir(c.ApplicationPath)
+	err = logic.Include(c.ApplicationPath, c.IncludeFolders)
 	if err != nil {
-		return libcnb.Layer{}, fmt.Errorf("unable to list children of %s\n%w", c.ApplicationPath, err)
+		return libcnb.Layer{}, err
 	}
 
-DELETE:
-	for _, f := range fs {
-		for _, excludeFolder := range c.ExcludeFolders {
-			if f.Name() == excludeFolder {
-				continue DELETE
-			}
-		}
-
-		file := filepath.Join(c.ApplicationPath, f.Name())
-		if err := os.RemoveAll(file); err != nil {
-			return libcnb.Layer{}, fmt.Errorf("unable to remove %s\n%w", file, err)
-		}
+	err = logic.Exclude(c.ApplicationPath, c.ExcludeFolders)
+	if err != nil {
+		return libcnb.Layer{}, err
 	}
 
 	if err := os.MkdirAll(filepath.Join(c.ApplicationPath, "bin"), 0755); err != nil {

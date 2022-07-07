@@ -625,7 +625,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				c, err = cargo.NewCargo(
 					cargo.WithApplicationPath(ctx.Application.Path),
 					cargo.WithCargoService(service),
-					cargo.WithExcludeFolders([]string{"static", "templates"}),
+					cargo.WithIncludeFolders("static/*:templates/*"),
 					cargo.WithSBOMScanner(sbomScanner))
 
 				Expect(err).ToNot(HaveOccurred())
