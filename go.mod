@@ -7,7 +7,7 @@ require (
 	github.com/heroku/color v0.0.6
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/onsi/gomega v1.20.1
-	github.com/paketo-buildpacks/libpak v1.61.0
+	github.com/paketo-buildpacks/libpak v1.62.0
 	github.com/paketo-buildpacks/source-removal v0.2.0
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/testify v1.8.0
@@ -27,7 +27,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
 	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b // indirect
-	golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64 // indirect
+	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
