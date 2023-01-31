@@ -7,9 +7,9 @@ codeowners:
   owner: "@paketo-community/rust-maintainers"
 
 package:
-  repository:     docker.io/paketocommunity/cargo
+  repositories:   ["docker.io/paketobuildpacks/cargo","gcr.io/paketo-buildpacks/cargo"]
   register:       true
-  registry_token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
+  registry_token: ${ secrets.PAKETO_BOT_GITHUB_TOKEN }
 
 docker_credentials:
   - registry: docker.io
@@ -24,4 +24,4 @@ dependencies:
     glob:       tini-amd64
     owner:      krallin
     repository: tini
-    token:      ${{ secrets.JAVA_GITHUB_TOKEN }}
+    token:      ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
