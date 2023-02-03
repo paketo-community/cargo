@@ -293,7 +293,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				_, err = c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.Getenv("CARGO_UNSTABLE_SPARSE_REGISTRY")).To(Equal("true"))
+				Expect(os.Getenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")).To(Equal("sparse"))
 
 				Expect(service.Calls[2].Method).To(Equal("InstallTool"))
 				Expect(service.Calls[2].Arguments[0]).To(Equal("foo-tool"))
@@ -343,7 +343,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.Getenv("CARGO_UNSTABLE_SPARSE_REGISTRY")).To(Equal("true"))
+				Expect(os.Getenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")).To(Equal("sparse"))
 
 				sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
@@ -390,7 +390,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.Getenv("CARGO_UNSTABLE_SPARSE_REGISTRY")).To(Equal("true"))
+				Expect(os.Getenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")).To(Equal("sparse"))
 
 				sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
@@ -437,7 +437,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.Getenv("CARGO_UNSTABLE_SPARSE_REGISTRY")).To(Equal("true"))
+				Expect(os.Getenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")).To(Equal("sparse"))
 
 				sbomScanner.AssertNotCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
@@ -489,7 +489,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 					outputLayer, err := c.Contribute(inputLayer)
 					Expect(err).NotTo(HaveOccurred())
 
-					Expect(os.Getenv("CARGO_UNSTABLE_SPARSE_REGISTRY")).To(Equal("true"))
+					Expect(os.Getenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")).To(Equal("sparse"))
 
 					sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
@@ -539,7 +539,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.Getenv("CARGO_UNSTABLE_SPARSE_REGISTRY")).To(Equal("true"))
+				Expect(os.Getenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")).To(Equal("sparse"))
 
 				sbomScanner.AssertCalled(t, "ScanLayer", inputLayer, ctx.Application.Path, libcnb.CycloneDXJSON, libcnb.SyftJSON)
 
@@ -653,7 +653,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				outputLayer, err := c.Contribute(inputLayer)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.Getenv("CARGO_UNSTABLE_SPARSE_REGISTRY")).To(Equal("true"))
+				Expect(os.Getenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")).To(Equal("sparse"))
 
 				Expect(outputLayer.LayerTypes.Cache).To(BeTrue())
 				Expect(outputLayer.LayerTypes.Build).To(BeFalse())
