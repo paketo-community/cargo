@@ -216,8 +216,8 @@ func (c Cargo) Contribute(layer libcnb.Layer) (libcnb.Layer, error) {
 			return libcnb.Layer{}, fmt.Errorf("unable to find CARGO_HOME, it must be set")
 		}
 
-		if err := os.Setenv("CARGO_UNSTABLE_SPARSE_REGISTRY", "true"); err != nil {
-			return libcnb.Layer{}, fmt.Errorf("unable to set CARGO_UNSTABLE_SPARSE_REGISTRY\n%w", err)
+		if err := os.Setenv("CARGO_REGISTRIES_CRATES_IO_PROTOCOL", "sparse"); err != nil {
+			return libcnb.Layer{}, fmt.Errorf("unable to set CARGO_REGISTRIES_CRATES_IO_PROTOCOL\n%w", err)
 		}
 
 		if err = preserver.RestoreAll(targetPath, cargoHome, layer.Path); err != nil {
