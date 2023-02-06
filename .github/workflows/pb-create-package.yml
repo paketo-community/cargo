@@ -195,7 +195,7 @@ jobs:
                     --format "${FORMAT}"
                 fi
               env:
-                PACKAGES: docker.io/paketobuildpacks/cargo gcr.io/paketo-buildpacks/cargo
+                PACKAGES: docker.io/paketocommunity/cargo gcr.io/paketo-community/cargo
                 PUBLISH: "true"
                 VERSION: ${{ steps.version.outputs.version }}
                 VERSION_MAJOR: ${{ steps.version.outputs.version-major }}
@@ -225,7 +225,7 @@ jobs:
             - if: ${{ true }}
               uses: docker://ghcr.io/buildpacks/actions/registry/request-add-entry:4.0.1
               with:
-                address: docker.io/paketobuildpacks/cargo@${{ steps.package.outputs.digest }}
+                address: docker.io/paketocommunity/cargo@${{ steps.package.outputs.digest }}
                 id: paketo-community/cargo
                 token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
                 version: ${{ steps.version.outputs.version }}
