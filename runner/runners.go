@@ -46,6 +46,11 @@ type CargoService interface {
 	RustVersion() (string, error)
 }
 
+const (
+	StaticTypeMUSLC   = "muslc"
+	StaticTypeGNULIBC = "gnulibc"
+)
+
 // Option is a function for configuring a CargoRunner
 type Option func(runner CargoRunner) CargoRunner
 
@@ -97,6 +102,14 @@ func WithStack(stack string) Option {
 	}
 }
 
+// WithStaticType sets the static type to use
+func WithStaticType(staticType string) Option {
+	return func(runner CargoRunner) CargoRunner {
+		runner.StaticType = staticType
+		return runner
+	}
+}
+
 // CargoRunner can execute cargo via CLI
 type CargoRunner struct {
 	CargoHome             string
@@ -105,6 +118,7 @@ type CargoRunner struct {
 	Executor              effect.Executor
 	Logger                bard.Logger
 	Stack                 string
+	StaticType            string
 }
 
 type metadataTarget struct {
@@ -362,7 +376,11 @@ func (c CargoRunner) BuildArgs(destLayer libcnb.Layer, defaultMemberPath string)
 	args = append(args, envArgs...)
 	args = append(args, "--color=never", fmt.Sprintf("--root=%s", destLayer.Path))
 	args = AddDefaultPath(args, defaultMemberPath)
-	args = AddDefaultTargetForTiny(args, c.Stack)
+
+	args, err = AddDefaultTargetForTinyOrStatic(args, c.Stack, c.StaticType)
+	if err != nil {
+		return []string{}, fmt.Errorf("unable to add default target\n%w", err)
+	}
 
 	return args, nil
 }
@@ -404,19 +422,43 @@ func AddDefaultPath(args []string, defaultMemberPath string) []string {
 	return append(args, fmt.Sprintf("--path=%s", defaultMemberPath))
 }
 
-// AddDefaultTargetForTiny will add --target=x86_64-unknown-linux-musl if the stack is Tiny and a `--target` is not already set
-func AddDefaultTargetForTiny(args []string, stack string) []string {
-	if stack != libpak.TinyStackID {
-		return args
+// AddDefaultTargetForTinyOrStatic will add the appropriate options if not already set
+func AddDefaultTargetForTinyOrStatic(args []string, stack string, staticType string) ([]string, error) {
+	if !libpak.IsTinyStack(stack) && !libpak.IsStaticStack(stack) {
+		return args, nil
 	}
 
+	// user already picked a target, back off
 	for _, arg := range args {
 		if arg == "--target" || strings.HasPrefix(arg, "--target=") {
-			return args
+			return args, nil
 		}
 	}
 
-	return append(args, "--target=x86_64-unknown-linux-musl")
+	// user set flags to do a static build, back off
+	rustFlags := os.Getenv("RUSTFLAGS")
+	if strings.Contains(rustFlags, "target-feature=+crt-static") {
+		return args, nil
+	}
+
+	target := "--target=x86_64-unknown-linux-musl"
+	if staticType == StaticTypeGNULIBC {
+		target = "--target=x86_64-unknown-linux-gnu"
+
+		rustFlagsList := []string{}
+		if len(rustFlags) > 0 {
+			rustFlagsList = append(rustFlagsList, rustFlags)
+		}
+		rustFlagsList = append(rustFlagsList, "-C target-feature=+crt-static")
+		newRustFlags := strings.Join(rustFlagsList, " ")
+
+		err := os.Setenv("RUSTFLAGS", newRustFlags)
+		if err != nil {
+			return []string{}, fmt.Errorf("unable to set env RUSTFLAGS to [%s]\n%w", newRustFlags, err)
+		}
+	}
+
+	return append(args, target), nil
 }
 
 func (c CargoRunner) fetchCargoMetadata(srcDir string) (metadata, error) {

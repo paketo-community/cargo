@@ -75,6 +75,12 @@ api = "0.7"
 
   [[metadata.configurations]]
     build = true
+    default = "muslc"
+    description = "type of static binary to build"
+    name = "BP_STATIC_BINARY_TYPE"
+
+  [[metadata.configurations]]
+    build = true
     default = "false"
     description = "Skip running SBOM scan"
     name = "BP_DISABLE_SBOM"

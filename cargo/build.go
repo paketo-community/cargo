@@ -92,6 +92,7 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 		cargoWorkspaceMembers, _ := cr.Resolve("BP_CARGO_WORKSPACE_MEMBERS")
 		cargoInstallArgs, _ := cr.Resolve("BP_CARGO_INSTALL_ARGS")
 		skipSBOMScan := cr.ResolveBool("BP_DISABLE_SBOM")
+		staticType, _ := cr.Resolve("BP_STATIC_BINARY_TYPE")
 
 		service := b.CargoService
 		if service == nil {
@@ -101,7 +102,8 @@ func (b Build) Build(context libcnb.BuildContext) (libcnb.BuildResult, error) {
 				runner.WithCargoInstallArgs(cargoInstallArgs),
 				runner.WithExecutor(effect.NewExecutor()),
 				runner.WithLogger(b.Logger),
-				runner.WithStack(context.StackID))
+				runner.WithStack(context.StackID),
+				runner.WithStaticType(staticType))
 		}
 
 		cache := Cache{
