@@ -84,9 +84,9 @@ api = "0.7"
     id = "tini"
     name = "Tini"
     purl = "pkg:generic/tini@v0.19.0"
-    sha256 = "93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c"
+    sha256 = "77cce5f4e61954b3420c4465197d8b826a4cf978eba016a9c5859eea0e4c0866"
     stacks = ["io.buildpacks.stacks.bionic", "io.paketo.stacks.tiny", "*"]
-    uri = "https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64"
+    uri = "https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-muslc-amd64"
     version = "0.19.0"
 
     [[metadata.dependencies.licenses]]

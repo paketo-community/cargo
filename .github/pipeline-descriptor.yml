@@ -24,7 +24,7 @@ dependencies:
   id:           tini
   uses:         docker://ghcr.io/paketo-buildpacks/actions/github-release-dependency:main
   with:
-    glob:       tini-amd64
+    glob:       tini-static-muslc-amd64
     owner:      krallin
     repository: tini
     token:      ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
