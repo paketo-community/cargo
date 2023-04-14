@@ -3,7 +3,7 @@ module github.com/paketo-community/cargo
 go 1.18
 
 require (
-	github.com/buildpacks/libcnb v1.27.0
+	github.com/buildpacks/libcnb v1.28.0
 	github.com/heroku/color v0.0.6
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/onsi/gomega v1.27.6
@@ -15,7 +15,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
-	github.com/Masterminds/semver/v3 v3.2.0 // indirect
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/creack/pty v1.1.18 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
