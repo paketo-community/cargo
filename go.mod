@@ -1,13 +1,13 @@
 module github.com/paketo-community/cargo
 
-go 1.18
+go 1.20
 
 require (
-	github.com/buildpacks/libcnb v1.27.0
+	github.com/buildpacks/libcnb v1.28.0
 	github.com/heroku/color v0.0.6
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/onsi/gomega v1.27.6
-	github.com/paketo-buildpacks/libpak v1.64.0
+	github.com/paketo-buildpacks/libpak v1.65.0
 	github.com/paketo-buildpacks/source-removal v0.2.0
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/testify v1.8.2
@@ -15,7 +15,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
-	github.com/Masterminds/semver/v3 v3.2.0 // indirect
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/creack/pty v1.1.18 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
@@ -26,8 +26,8 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	golang.org/x/net v0.8.0 // indirect
-	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/text v0.8.0 // indirect
+	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
