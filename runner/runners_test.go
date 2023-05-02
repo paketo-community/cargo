@@ -227,21 +227,45 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 
 	context("set default --target argument", func() {
 		it("is specified by the user", func() {
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--target"}, "foo", runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--target"}))
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--target=test"}, "foo", runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--target=test"}))
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--target", "test"}, "foo", runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--target", "test"}))
+			args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--target"}, "foo", runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--target"}))
+
+			args, err = runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--target=test"}, "foo", runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--target=test"}))
+
+			args, err = runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--target", "test"}, "foo", runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--target", "test"}))
 		})
 
 		it("is not the tiny stack so no args are added", func() {
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, "foo", runner.StaticTypeMUSLC)).To(Equal([]string{"install"}))
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, "foo", runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--foo=bar"}))
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo", "bar"}, "foo", runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--foo", "bar"}))
+			args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, "foo", runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install"}))
+
+			args, err = runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, "foo", runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--foo=bar"}))
+
+			args, err = runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo", "bar"}, "foo", runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--foo", "bar"}))
 		})
 
 		it("is the tiny stack so default args are added", func() {
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--target=x86_64-unknown-linux-musl"}))
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, libpak.BionicTinyStackID, runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--foo=bar", "--target=x86_64-unknown-linux-musl"}))
-			Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo", "bar"}, libpak.BionicTinyStackID, runner.StaticTypeMUSLC)).To(Equal([]string{"install", "--foo", "bar", "--target=x86_64-unknown-linux-musl"}))
+			args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--target=x86_64-unknown-linux-musl"}))
+
+			args, err = runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, libpak.BionicTinyStackID, runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--foo=bar", "--target=x86_64-unknown-linux-musl"}))
+
+			args, err = runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo", "bar"}, libpak.BionicTinyStackID, runner.StaticTypeMUSLC)
+			Expect(err).To(Succeed())
+			Expect(args).To(Equal([]string{"install", "--foo", "bar", "--target=x86_64-unknown-linux-musl"}))
 		})
 
 		context("unset RUSTFLAGS", func() {
@@ -250,12 +274,16 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("is the tiny stack so default args are added with static type GNU LIBC", func() {
-				Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)).To(Equal([]string{"install", "--target=x86_64-unknown-linux-gnu"}))
+				args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)
+				Expect(err).To(Succeed())
+				Expect(args).To(Equal([]string{"install", "--target=x86_64-unknown-linux-gnu"}))
 				Expect(os.Getenv("RUSTFLAGS")).To(Equal("-C target-feature=+crt-static"))
 			})
 
 			it("is the tiny stack so default args are added with static type GNU LIBC including existing args", func() {
-				Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)).To(Equal([]string{"install", "--foo=bar", "--target=x86_64-unknown-linux-gnu"}))
+				args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)
+				Expect(err).To(Succeed())
+				Expect(args).To(Equal([]string{"install", "--foo=bar", "--target=x86_64-unknown-linux-gnu"}))
 				Expect(os.Getenv("RUSTFLAGS")).To(Equal("-C target-feature=+crt-static"))
 			})
 		})
@@ -266,12 +294,16 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("is the tiny stack so default args are added with static type GNU LIBC", func() {
-				Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)).To(Equal([]string{"install", "--target=x86_64-unknown-linux-gnu"}))
+				args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)
+				Expect(err).To(Succeed())
+				Expect(args).To(Equal([]string{"install", "--target=x86_64-unknown-linux-gnu"}))
 				Expect(os.Getenv("RUSTFLAGS")).To(Equal("--something foo --more -C target-feature=+crt-static"))
 			})
 
 			it("is the tiny stack so default args are added with static type GNU LIBC including existing args", func() {
-				Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)).To(Equal([]string{"install", "--foo=bar", "--target=x86_64-unknown-linux-gnu"}))
+				args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install", "--foo=bar"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)
+				Expect(err).To(Succeed())
+				Expect(args).To(Equal([]string{"install", "--foo=bar", "--target=x86_64-unknown-linux-gnu"}))
 				Expect(os.Getenv("RUSTFLAGS")).To(Equal("--something foo --more -C target-feature=+crt-static"))
 			})
 		})
@@ -282,7 +314,9 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("is the tiny stack so default args are added with static type GNU LIBC", func() {
-				Expect(runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)).To(Equal([]string{"install"}))
+				args, err := runner.AddDefaultTargetForTinyOrStatic([]string{"install"}, libpak.BionicTinyStackID, runner.StaticTypeGNULIBC)
+				Expect(err).To(Succeed())
+				Expect(args).To(Equal([]string{"install"}))
 				Expect(os.Getenv("RUSTFLAGS")).To(Equal("-C target-feature=+crt-static"))
 			})
 		})
