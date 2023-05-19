@@ -10,7 +10,7 @@ require (
 	github.com/paketo-buildpacks/libpak v1.65.0
 	github.com/paketo-buildpacks/source-removal v0.2.0
 	github.com/sclevine/spec v1.4.0
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 )
 
 require (
