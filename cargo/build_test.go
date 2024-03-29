@@ -18,7 +18,6 @@ package cargo_test
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,12 +44,12 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 	it.Before(func() {
 		var err error
 
-		ctx.Application.Path, err = ioutil.TempDir("", "build-application")
+		ctx.Application.Path = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(os.MkdirAll(filepath.Join(ctx.Application.Path, "bin"), 0755)).ToNot(HaveOccurred())
 
-		ctx.Layers.Path, err = ioutil.TempDir("", "build-layers")
+		ctx.Layers.Path = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 
 		ctx.Buildpack.Metadata = map[string]interface{}{
