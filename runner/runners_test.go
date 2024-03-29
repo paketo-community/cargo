@@ -377,52 +377,104 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		context("and there is metadata", func() {
-			it("parses the member paths from metadata", func() {
-				logBuf := bytes.Buffer{}
-				logger := bard.NewLogger(&logBuf)
+			context("pre-rust 1.77.0", func() {
+				it("parses the member paths from metadata", func() {
+					logBuf := bytes.Buffer{}
+					logger := bard.NewLogger(&logBuf)
 
-				metadata := BuildMetadata("/workspace",
-					[]string{
-						"basics 2.0.0 (path+file:///workspace/basics)",
-						"todo 1.2.0 (path+file:///workspace/todo)",
-						"routes 0.5.0 (path+file:///workspace/routes)",
-						"jokes 1.5.6 (path+file:///workspace/jokes)",
+					metadata := BuildMetadata("/workspace",
+						[]string{
+							"basics 2.0.0 (path+file:///workspace/basics)",
+							"todo 1.2.0 (path+file:///workspace/todo)",
+							"routes 0.5.0 (path+file:///workspace/routes)",
+							"jokes 1.5.6 (path+file:///workspace/jokes)",
+						})
+
+					executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
+						Expect(ex.Args).To(Equal([]string{"metadata", "--format-version=1", "--no-deps"}))
+						return true
+					})).Return(func(ex effect.Execution) error {
+						_, err := ex.Stdout.Write([]byte(metadata))
+						Expect(err).ToNot(HaveOccurred())
+						return nil
 					})
 
-				executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
-					Expect(ex.Args).To(Equal([]string{"metadata", "--format-version=1", "--no-deps"}))
-					return true
-				})).Return(func(ex effect.Execution) error {
-					_, err := ex.Stdout.Write([]byte(metadata))
+					runner := runner.NewCargoRunner(
+						runner.WithCargoHome(cargoHome),
+						runner.WithExecutor(executor),
+						runner.WithLogger(logger))
+
+					urls, err := runner.WorkspaceMembers(workingDir, destLayer)
 					Expect(err).ToNot(HaveOccurred())
-					return nil
+
+					Expect(urls).To(HaveLen(4))
+
+					url, err := url.Parse("path+file:///workspace/basics")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[0]).To(Equal(*url))
+
+					url, err = url.Parse("path+file:///workspace/todo")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[1]).To(Equal(*url))
+
+					url, err = url.Parse("path+file:///workspace/routes")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[2]).To(Equal(*url))
+
+					url, err = url.Parse("path+file:///workspace/jokes")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[3]).To(Equal(*url))
 				})
+			})
 
-				runner := runner.NewCargoRunner(
-					runner.WithCargoHome(cargoHome),
-					runner.WithExecutor(executor),
-					runner.WithLogger(logger))
+			context("post-rust 1.77.0", func() {
+				it("parses the member paths from metadata", func() {
+					logBuf := bytes.Buffer{}
+					logger := bard.NewLogger(&logBuf)
 
-				urls, err := runner.WorkspaceMembers(workingDir, destLayer)
-				Expect(err).ToNot(HaveOccurred())
+					metadata := BuildMetadata("/workspace",
+						[]string{
+							"path+file:///workspace/basics#basics@2.0.0",
+							"path+file:///workspace/todo#todo@1.2.0",
+							"path+file:///workspace/routes#routes@0.5.0",
+							"path+file:///workspace/jokes#jokes@1.5.6",
+						})
 
-				Expect(urls).To(HaveLen(4))
+					executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
+						Expect(ex.Args).To(Equal([]string{"metadata", "--format-version=1", "--no-deps"}))
+						return true
+					})).Return(func(ex effect.Execution) error {
+						_, err := ex.Stdout.Write([]byte(metadata))
+						Expect(err).ToNot(HaveOccurred())
+						return nil
+					})
 
-				url, err := url.Parse("path+file:///workspace/basics")
-				Expect(err).ToNot(HaveOccurred())
-				Expect(urls[0]).To(Equal(*url))
+					runner := runner.NewCargoRunner(
+						runner.WithCargoHome(cargoHome),
+						runner.WithExecutor(executor),
+						runner.WithLogger(logger))
 
-				url, err = url.Parse("path+file:///workspace/todo")
-				Expect(err).ToNot(HaveOccurred())
-				Expect(urls[1]).To(Equal(*url))
+					urls, err := runner.WorkspaceMembers(workingDir, destLayer)
+					Expect(err).ToNot(HaveOccurred())
 
-				url, err = url.Parse("path+file:///workspace/routes")
-				Expect(err).ToNot(HaveOccurred())
-				Expect(urls[2]).To(Equal(*url))
+					Expect(urls).To(HaveLen(4))
 
-				url, err = url.Parse("path+file:///workspace/jokes")
-				Expect(err).ToNot(HaveOccurred())
-				Expect(urls[3]).To(Equal(*url))
+					url, err := url.Parse("path+file:///workspace/basics")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[0]).To(Equal(*url))
+
+					url, err = url.Parse("path+file:///workspace/todo")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[1]).To(Equal(*url))
+
+					url, err = url.Parse("path+file:///workspace/routes")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[2]).To(Equal(*url))
+
+					url, err = url.Parse("path+file:///workspace/jokes")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[3]).To(Equal(*url))
+				})
 			})
 
 			context("member filter is set", func() {
@@ -717,6 +769,43 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 				url, err = url.Parse("path+file:///workspace/jokes")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(urls[1]).To(Equal(*url))
+			})
+		})
+	})
+
+	context("parses workspace members", func() {
+		context("pre-rust 1.77.0", func() {
+			it("parses them", func() {
+				pkgName, version, url, err := runner.ParseWorkspaceMember("basics 2.0.0 (path+file:///workspace/basics)")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(pkgName).To(Equal("basics"))
+				Expect(version).To(Equal("2.0.0"))
+				Expect(url).To(Equal("path+file:///workspace/basics"))
+			})
+
+			it("fails to parse because not enough spaces", func() {
+				_, _, _, err := runner.ParseWorkspaceMember("basics 2.0.0")
+				Expect(err).To(MatchError("unable to parse workspace member [basics 2.0.0], unexpected format"))
+			})
+		})
+
+		context("pre-rust 1.77.0", func() {
+			it("parses them", func() {
+				pkgName, version, url, err := runner.ParseWorkspaceMember("path+file:///workspace/basics#basics@2.0.0")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(pkgName).To(Equal("basics"))
+				Expect(version).To(Equal("2.0.0"))
+				Expect(url).To(Equal("path+file:///workspace/basics"))
+			})
+
+			it("fails to parse because there is no hash sign", func() {
+				_, _, _, err := runner.ParseWorkspaceMember("path+file:///workspace/basics")
+				Expect(err).To(MatchError("unable to parse workspace member [path+file:///workspace/basics], missing `#`"))
+			})
+
+			it("fails to parse because there is no at sign", func() {
+				_, _, _, err := runner.ParseWorkspaceMember("path+file:///workspace/basics#foo")
+				Expect(err).To(MatchError("unable to parse workspace member [path+file:///workspace/basics#foo], missing `@`"))
 			})
 		})
 	})
