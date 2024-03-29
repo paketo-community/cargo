@@ -28,3 +28,14 @@ dependencies:
     owner:      krallin
     repository: tini
     token:      ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
+
+# ARM64
+- name:         Tini ARM64
+  id:           tini
+  uses:         docker://ghcr.io/paketo-buildpacks/actions/github-release-dependency:main
+  with:
+    glob:       tini-static-arm64
+    owner:      krallin
+    repository: tini
+    token:      ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
+    arch:       arm64
