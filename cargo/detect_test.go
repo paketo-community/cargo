@@ -17,7 +17,6 @@
 package cargo_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,7 +39,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	it.Before(func() {
 		var err error
 
-		ctx.Application.Path, err = ioutil.TempDir("", "cargo")
+		ctx.Application.Path = t.TempDir()
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -50,7 +49,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 
 	context("missing required files", func() {
 		it("missing Cargo.toml", func() {
-			Expect(ioutil.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.lock"), []byte{}, 0644))
+			Expect(os.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.lock"), []byte{}, 0644))
 
 			plan, err := detect.Detect(ctx)
 			Expect(err).ToNot(HaveOccurred())
@@ -58,7 +57,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("missing Cargo.lock", func() {
-			Expect(ioutil.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.toml"), []byte{}, 0644))
+			Expect(os.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.toml"), []byte{}, 0644))
 
 			plan, err := detect.Detect(ctx)
 			Expect(err).ToNot(HaveOccurred())
@@ -73,8 +72,8 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	it("passes with both Cargo.toml and Cargo.lock", func() {
-		Expect(ioutil.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.toml"), []byte{}, 0644))
-		Expect(ioutil.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.lock"), []byte{}, 0644))
+		Expect(os.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.toml"), []byte{}, 0644))
+		Expect(os.WriteFile(filepath.Join(ctx.Application.Path, "Cargo.lock"), []byte{}, 0644))
 
 		Expect(detect.Detect(ctx)).To(Equal(libcnb.DetectResult{
 			Pass: true,

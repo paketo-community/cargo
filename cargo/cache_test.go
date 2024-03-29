@@ -17,7 +17,6 @@
 package cargo_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,10 +38,10 @@ func testCache(t *testing.T, context spec.G, it spec.S) {
 	it.Before(func() {
 		var err error
 
-		appDir, err = ioutil.TempDir("", "app-dir")
+		appDir = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 
-		ctx.Layers.Path, err = ioutil.TempDir("", "cache-layers")
+		ctx.Layers.Path = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 	})
 

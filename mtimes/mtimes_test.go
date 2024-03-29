@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,7 +45,7 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 	it.Before(func() {
 		var err error
 
-		workDir, err = ioutil.TempDir("", "mtimes-test")
+		workDir = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 
 		mtimesTemplate, err = template.New("mtimes.json").ParseFiles("testdata/mtimes.json")
@@ -103,7 +102,7 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 			mtimesFile := filepath.Join(workDir, "testdata/mtimes.json")
 			Expect(mtimesFile).To(BeARegularFile())
 
-			buf, err := ioutil.ReadFile(mtimesFile)
+			buf, err := os.ReadFile(mtimesFile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(buf)).To(ContainSubstring("testdata"))
 			Expect(string(buf)).To(ContainSubstring("testdata/folder1"))
@@ -131,7 +130,7 @@ func testMTimes(t *testing.T, context spec.G, it spec.S) {
 			var b bytes.Buffer
 			err := mtimesTemplate.Execute(&b, map[string]string{"WorkDir": workDir})
 			Expect(err).ToNot(HaveOccurred())
-			err = ioutil.WriteFile(filepath.Join(workDir, "testdata/mtimes.json"), b.Bytes(), 0644)
+			err = os.WriteFile(filepath.Join(workDir, "testdata/mtimes.json"), b.Bytes(), 0644)
 			Expect(err).ToNot(HaveOccurred())
 
 			preserver := mtimes.NewPreserver(bard.NewLogger(&logs))

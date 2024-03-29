@@ -18,7 +18,6 @@ package cargo_test
 
 import (
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -48,13 +47,13 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 	it.Before(func() {
 		var err error
 
-		ctx.Layers.Path, err = ioutil.TempDir("", "cargo-layers")
+		ctx.Layers.Path = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 
-		ctx.Application.Path, err = ioutil.TempDir("", "app-dir")
+		ctx.Application.Path = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 
-		cargoHome, err = ioutil.TempDir("", "cargo-home")
+		cargoHome = t.TempDir()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.Setenv("CARGO_HOME", cargoHome)).ToNot(HaveOccurred())
 
@@ -83,7 +82,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(os.MkdirAll(filepath.Join(ctx.Application.Path, "src"), 0755)).To(Succeed())
 			appFile = filepath.Join(ctx.Application.Path, "src", "main.rs")
-			Expect(ioutil.WriteFile(appFile, []byte{}, 0644)).To(Succeed())
+			Expect(os.WriteFile(appFile, []byte{}, 0644)).To(Succeed())
 		})
 
 		context("validate metadata", func() {
@@ -279,7 +278,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{}, nil)
 				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					err := os.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
@@ -329,7 +328,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 				service.On("WorkspaceMembers", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return([]url.URL{}, nil)
 				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					err := os.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
@@ -375,7 +374,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					err := os.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
@@ -422,7 +421,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					err := os.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
@@ -474,7 +473,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 					service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 						Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-						err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+						err := os.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 						Expect(err).ToNot(HaveOccurred())
 						return nil
 					})
@@ -524,7 +523,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				service.On("InstallMember", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(memberPath string, srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", filepath.Base(memberPath)), []byte("contents"), 0644)
+					err := os.WriteFile(filepath.Join(layer.Path, "bin", filepath.Base(memberPath)), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})
@@ -619,7 +618,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				for _, appFile := range append(appFilesKeep, appFilesGone...) {
 					Expect(os.MkdirAll(filepath.Dir(appFile), 0755)).To(Succeed())
-					Expect(ioutil.WriteFile(appFile, []byte{}, 0644)).To(Succeed())
+					Expect(os.WriteFile(appFile, []byte{}, 0644)).To(Succeed())
 				}
 
 				c, err = cargo.NewCargo(
@@ -638,7 +637,7 @@ func testCargo(t *testing.T, context spec.G, it spec.S) {
 
 				service.On("Install", mock.AnythingOfType("string"), mock.AnythingOfType("libcnb.Layer")).Return(func(srcDir string, layer libcnb.Layer) error {
 					Expect(os.MkdirAll(filepath.Join(layer.Path, "bin"), 0755)).ToNot(HaveOccurred())
-					err := ioutil.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
+					err := os.WriteFile(filepath.Join(layer.Path, "bin", "my-binary"), []byte("contents"), 0644)
 					Expect(err).ToNot(HaveOccurred())
 					return nil
 				})

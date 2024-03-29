@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/buildpacks/libcnb"
@@ -473,9 +474,11 @@ func AddDefaultTargetForTinyOrStatic(args []string, stack string, staticType str
 		return args, nil
 	}
 
-	target := "--target=x86_64-unknown-linux-musl"
+	arch := archFromSystem()
+
+	target := fmt.Sprintf("--target=%s-unknown-linux-musl", arch)
 	if staticType == StaticTypeGNULIBC {
-		target = "--target=x86_64-unknown-linux-gnu"
+		target = fmt.Sprintf("--target=%s-unknown-linux-gnu", arch)
 
 		rustFlagsList := []string{}
 		if len(rustFlags) > 0 {
@@ -528,4 +531,19 @@ func (c CargoRunner) makeFilterMap() map[string]bool {
 	}
 
 	return filterMap
+}
+
+func archFromSystem() string {
+	archFromEnv, ok := os.LookupEnv("BP_ARCH")
+	if !ok {
+		archFromEnv = runtime.GOARCH
+	}
+
+	if archFromEnv == "amd64" {
+		return "x86_64"
+	} else if archFromEnv == "arm64" {
+		return "aarch64"
+	} else {
+		return archFromEnv
+	}
 }
