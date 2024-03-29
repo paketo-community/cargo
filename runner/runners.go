@@ -221,19 +221,51 @@ func (c CargoRunner) WorkspaceMembers(srcDir string, destLayer libcnb.Layer) ([]
 
 	var paths []url.URL
 	for _, workspace := range m.WorkspaceMembers {
-		// This is OK because the workspace member format is `package-name package-version (url)` and
-		//   none of name, version or URL may contain a space & be valid
-		parts := strings.SplitN(workspace, " ", 3)
-		if len(filterMap) > 0 && filterMap[strings.TrimSpace(parts[0])] || len(filterMap) == 0 {
-			path, err := url.Parse(strings.TrimSuffix(strings.TrimPrefix(parts[2], "("), ")"))
+		pkgName, _, pathUrl, err := ParseWorkspaceMember(workspace)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse: %w", err)
+		}
+
+		if len(filterMap) > 0 && filterMap[strings.TrimSpace(pkgName)] || len(filterMap) == 0 {
+			path, err := url.Parse(pathUrl)
 			if err != nil {
-				return nil, fmt.Errorf("unable to parse URL %s: %w", workspace, err)
+				return nil, fmt.Errorf("unable to parse path URL %s: %w", workspace, err)
 			}
 			paths = append(paths, *path)
 		}
 	}
 
 	return paths, nil
+}
+
+// parseWorkspaceMember parses a workspace member which can be in a couple of different formats
+//
+//	pre-1.77: `package-name package-version (url)`, like `function 0.1.0 (path+file:///Users/dmikusa/Downloads/fn-rs)`
+//	1.77+: `url#package-name@package-version` like `path+file:///Users/dmikusa/Downloads/fn-rs#function@0.1.0`
+//
+// returns the package name, version, URL, and optional error in that order
+func ParseWorkspaceMember(workspaceMember string) (string, string, string, error) {
+	if strings.HasPrefix(workspaceMember, "path+file://") {
+		half := strings.SplitN(workspaceMember, "#", 2)
+		if len(half) != 2 {
+			return "", "", "", fmt.Errorf("unable to parse workspace member [%s], missing `#`", workspaceMember)
+		}
+
+		otherHalf := strings.SplitN(half[1], "@", 2)
+		if len(otherHalf) != 2 {
+			return "", "", "", fmt.Errorf("unable to parse workspace member [%s], missing `@`", workspaceMember)
+		}
+
+		return strings.TrimSpace(otherHalf[0]), strings.TrimSpace(otherHalf[1]), strings.TrimSpace(half[0]), nil
+	} else {
+		// This is OK because the workspace member format is `package-name package-version (url)` and
+		//   none of name, version or URL may contain a space & be valid
+		parts := strings.SplitN(workspaceMember, " ", 3)
+		if len(parts) != 3 {
+			return "", "", "", fmt.Errorf("unable to parse workspace member [%s], unexpected format", workspaceMember)
+		}
+		return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), strings.TrimSuffix(strings.TrimPrefix(parts[2], "("), ")"), nil
+	}
 }
 
 // ProjectTargets loads the members from the project workspace
