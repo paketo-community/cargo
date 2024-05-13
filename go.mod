@@ -6,8 +6,8 @@ require (
 	github.com/buildpacks/libcnb v1.30.3
 	github.com/heroku/color v0.0.6
 	github.com/mattn/go-shellwords v1.0.12
-	github.com/onsi/gomega v1.33.0
-	github.com/paketo-buildpacks/libpak v1.69.1
+	github.com/onsi/gomega v1.33.1
+	github.com/paketo-buildpacks/libpak v1.70.0
 	github.com/paketo-buildpacks/source-removal v0.2.1
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/testify v1.9.0
@@ -19,7 +19,6 @@ require (
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/pprof v0.0.0-20221118152302-e6195bd50e26 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -28,9 +27,9 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	golang.org/x/net v0.24.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
