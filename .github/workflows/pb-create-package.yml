@@ -191,7 +191,7 @@ jobs:
                     --format "${FORMAT}" $([ -n "$TTL_SH_PUBLISH" ] && [ "$TTL_SH_PUBLISH" = "true" ] && echo "--publish")
                 fi
               env:
-                PACKAGES: docker.io/paketocommunity/cargo gcr.io/paketo-community/cargo
+                PACKAGES: docker.io/paketocommunity/cargo
                 PUBLISH: "true"
                 VERSION: ${{ steps.version.outputs.version }}
                 VERSION_MAJOR: ${{ steps.version.outputs.version-major }}
