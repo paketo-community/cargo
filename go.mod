@@ -1,6 +1,6 @@
 module github.com/paketo-community/cargo
 
-go 1.23.2
+go 1.23.3
 
 require (
 	github.com/buildpacks/libcnb v1.30.4
@@ -8,7 +8,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/onsi/gomega v1.35.1
 	github.com/paketo-buildpacks/libpak v1.72.0
-	github.com/paketo-buildpacks/source-removal v0.2.19
+	github.com/paketo-buildpacks/source-removal v0.2.20
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/testify v1.9.0
 )
