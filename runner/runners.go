@@ -253,11 +253,15 @@ func ParseWorkspaceMember(workspaceMember string) (string, string, string, error
 		}
 
 		otherHalf := strings.SplitN(half[1], "@", 2)
-		if len(otherHalf) != 2 {
-			return "", "", "", fmt.Errorf("unable to parse workspace member [%s], missing `@`", workspaceMember)
+		if len(otherHalf) == 2 {
+			return strings.TrimSpace(otherHalf[0]), strings.TrimSpace(otherHalf[1]), strings.TrimSpace(half[0]), nil
+		} else {
+			splitIndex := strings.LastIndex(half[0], "/")
+			path := half[0][:splitIndex]
+			pkgName := half[0][splitIndex+1:]
+			return strings.TrimSpace(pkgName), strings.TrimSpace(half[1]), strings.TrimSpace(path), nil
 		}
 
-		return strings.TrimSpace(otherHalf[0]), strings.TrimSpace(otherHalf[1]), strings.TrimSpace(half[0]), nil
 	} else {
 		// This is OK because the workspace member format is `package-name package-version (url)` and
 		//   none of name, version or URL may contain a space & be valid
