@@ -241,9 +241,12 @@ func (c CargoRunner) WorkspaceMembers(srcDir string, destLayer libcnb.Layer) ([]
 
 // parseWorkspaceMember parses a workspace member which can be in a couple of different formats
 //
-//	pre-1.77: `package-name package-version (url)`, like `function 0.1.0 (path+file:///Users/dmikusa/Downloads/fn-rs)`
-//	1.77+: `url#package-name@package-version` like `path+file:///Users/dmikusa/Downloads/fn-rs#function@0.1.0`
+//		pre-1.77: `package-name package-version (url)`, like `function 0.1.0 (path+file:///Users/dmikusa/Downloads/fn-rs)`
+//		1.77+:
+//	     - `url#package-name@package-version` like `path+file:///Users/dmikusa/Downloads/fn-rs#function@0.1.0`
+//	     - `url#version` for local packages where the workspace member name is equal to the directory name like `path+file:///Users/jondoe/.../services/example-transform#0.1.0`
 //
+// The final directory is assumed to be the package name with the local package format.
 // returns the package name, version, URL, and optional error in that order
 func ParseWorkspaceMember(workspaceMember string) (string, string, string, error) {
 	if strings.HasPrefix(workspaceMember, "path+file://") {
