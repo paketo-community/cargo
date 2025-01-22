@@ -241,9 +241,12 @@ func (c CargoRunner) WorkspaceMembers(srcDir string, destLayer libcnb.Layer) ([]
 
 // parseWorkspaceMember parses a workspace member which can be in a couple of different formats
 //
-//	pre-1.77: `package-name package-version (url)`, like `function 0.1.0 (path+file:///Users/dmikusa/Downloads/fn-rs)`
-//	1.77+: `url#package-name@package-version` like `path+file:///Users/dmikusa/Downloads/fn-rs#function@0.1.0`
+//		pre-1.77: `package-name package-version (url)`, like `function 0.1.0 (path+file:///Users/dmikusa/Downloads/fn-rs)`
+//		1.77+:
+//	     - `url#package-name@package-version` like `path+file:///Users/dmikusa/Downloads/fn-rs#function@0.1.0`
+//	     - `url#version` for local packages where the workspace member name is equal to the directory name like `path+file:///Users/jondoe/.../services/example-transform#0.1.0`
 //
+// The final directory is assumed to be the package name with the local package format.
 // returns the package name, version, URL, and optional error in that order
 func ParseWorkspaceMember(workspaceMember string) (string, string, string, error) {
 	if strings.HasPrefix(workspaceMember, "path+file://") {
@@ -253,11 +256,15 @@ func ParseWorkspaceMember(workspaceMember string) (string, string, string, error
 		}
 
 		otherHalf := strings.SplitN(half[1], "@", 2)
-		if len(otherHalf) != 2 {
-			return "", "", "", fmt.Errorf("unable to parse workspace member [%s], missing `@`", workspaceMember)
+		if len(otherHalf) == 2 {
+			return strings.TrimSpace(otherHalf[0]), strings.TrimSpace(otherHalf[1]), strings.TrimSpace(half[0]), nil
+		} else {
+			splitIndex := strings.LastIndex(half[0], "/")
+			path := half[0][:splitIndex]
+			pkgName := half[0][splitIndex+1:]
+			return strings.TrimSpace(pkgName), strings.TrimSpace(half[1]), strings.TrimSpace(path), nil
 		}
 
-		return strings.TrimSpace(otherHalf[0]), strings.TrimSpace(otherHalf[1]), strings.TrimSpace(half[0]), nil
 	} else {
 		// This is OK because the workspace member format is `package-name package-version (url)` and
 		//   none of name, version or URL may contain a space & be valid
