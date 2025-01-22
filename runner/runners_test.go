@@ -471,6 +471,7 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 							"path+file:///workspace/todo#todo@1.2.0",
 							"path+file:///workspace/routes#routes@0.5.0",
 							"path+file:///workspace/jokes#jokes@1.5.6",
+							"path+file:///workspace/other-format/other-format#1.0.0",
 						})
 
 					executor.On("Execute", mock.MatchedBy(func(ex effect.Execution) bool {
@@ -490,7 +491,7 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 					urls, err := runner.WorkspaceMembers(workingDir, destLayer)
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(urls).To(HaveLen(4))
+					Expect(urls).To(HaveLen(5))
 
 					url, err := url.Parse("path+file:///workspace/basics")
 					Expect(err).ToNot(HaveOccurred())
@@ -507,6 +508,10 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 					url, err = url.Parse("path+file:///workspace/jokes")
 					Expect(err).ToNot(HaveOccurred())
 					Expect(urls[3]).To(Equal(*url))
+
+					url, err = url.Parse("path+file:///workspace/other-format")
+					Expect(err).ToNot(HaveOccurred())
+					Expect(urls[4]).To(Equal(*url))
 				})
 			})
 
@@ -830,15 +835,16 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 				Expect(version).To(Equal("2.0.0"))
 				Expect(url).To(Equal("path+file:///workspace/basics"))
 			})
-
+			it("parses alternative package-id", func() {
+				pkgName, version, url, err := runner.ParseWorkspaceMember("path+file:///workspace/basics/basics#2.0.0")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(pkgName).To(Equal("basics"))
+				Expect(version).To(Equal("2.0.0"))
+				Expect(url).To(Equal("path+file:///workspace/basics"))
+			})
 			it("fails to parse because there is no hash sign", func() {
 				_, _, _, err := runner.ParseWorkspaceMember("path+file:///workspace/basics")
 				Expect(err).To(MatchError("unable to parse workspace member [path+file:///workspace/basics], missing `#`"))
-			})
-
-			it("fails to parse because there is no at sign", func() {
-				_, _, _, err := runner.ParseWorkspaceMember("path+file:///workspace/basics#foo")
-				Expect(err).To(MatchError("unable to parse workspace member [path+file:///workspace/basics#foo], missing `@`"))
 			})
 		})
 	})
