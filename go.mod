@@ -8,14 +8,14 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/onsi/gomega v1.37.0
 	github.com/paketo-buildpacks/libpak v1.73.0
-	github.com/paketo-buildpacks/source-removal v0.2.49
+	github.com/paketo-buildpacks/source-removal v0.2.50
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/testify v1.10.0
 )
 
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
-	github.com/Masterminds/semver/v3 v3.3.1 // indirect
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
