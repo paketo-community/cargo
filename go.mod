@@ -8,7 +8,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.16
 	github.com/onsi/gomega v1.44.0
 	github.com/paketo-buildpacks/libpak v1.73.0
-	github.com/paketo-buildpacks/source-removal v1.0.44
+	github.com/paketo-buildpacks/source-removal v1.0.45
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/testify v1.12.1
 )
@@ -22,7 +22,7 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
-	github.com/stretchr/objx v0.5.3 // indirect
+	github.com/stretchr/objx v0.8.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
