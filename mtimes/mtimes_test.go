@@ -177,7 +177,7 @@ func (matcher *haveMTimeMatcher) Match(actual interface{}) (success bool, err er
 	}
 	matcher.actual = fileInfo.ModTime().UTC()
 
-	return matcher.expected == matcher.actual, nil
+	return matcher.expected.Equal(matcher.actual), nil
 }
 
 func (matcher *haveMTimeMatcher) FailureMessage(_ interface{}) (message string) {

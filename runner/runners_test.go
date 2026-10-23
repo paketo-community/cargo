@@ -509,7 +509,7 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 					Expect(err).ToNot(HaveOccurred())
 					Expect(urls[3]).To(Equal(*url))
 
-					url, err = url.Parse("path+file:///workspace/other-format")
+					url, err = url.Parse("path+file:///workspace/other-format/other-format")
 					Expect(err).ToNot(HaveOccurred())
 					Expect(urls[4]).To(Equal(*url))
 				})
@@ -840,7 +840,7 @@ func testRunners(t *testing.T, context spec.G, it spec.S) {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(pkgName).To(Equal("basics"))
 				Expect(version).To(Equal("2.0.0"))
-				Expect(url).To(Equal("path+file:///workspace/basics"))
+				Expect(url).To(Equal("path+file:///workspace/basics/basics"))
 			})
 			it("fails to parse because there is no hash sign", func() {
 				_, _, _, err := runner.ParseWorkspaceMember("path+file:///workspace/basics")
