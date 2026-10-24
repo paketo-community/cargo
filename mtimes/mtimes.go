@@ -51,7 +51,9 @@ func (p Preserver) Preserve(path string) error {
 	if err != nil {
 		return fmt.Errorf("unable create metadata file %s\n%w", metadataPath, err)
 	}
-	defer fileOut.Close()
+	defer func() {
+		_ = fileOut.Close()
+	}()
 
 	jsonEncoder := json.NewEncoder(fileOut)
 
@@ -104,7 +106,9 @@ func (p Preserver) Restore(path string) error {
 		}
 		return fmt.Errorf("unable open metadata file %s\n%w", metadataPath, err)
 	}
-	defer fileIn.Close()
+	defer func() {
+		_ = fileIn.Close()
+	}()
 
 	jsonDecoder := json.NewDecoder(fileIn)
 
