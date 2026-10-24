@@ -181,8 +181,8 @@ func (c CargoRunner) InstallMember(memberPath string, srcDir string, destLayer l
 		Command: "cargo",
 		Args:    args,
 		Dir:     srcDir,
-		Stdout:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
-		Stderr:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
+		Stdout:  bard.NewWriter(c.Logger.InfoWriter(), bard.WithIndent(3)),
+		Stderr:  bard.NewWriter(c.Logger.InfoWriter(), bard.WithIndent(3)),
 	}); err != nil {
 		return fmt.Errorf("unable to build\n%w", err)
 	}
@@ -202,8 +202,8 @@ func (c CargoRunner) InstallTool(name string, additionalArgs []string) error {
 	if err := c.Executor.Execute(effect.Execution{
 		Command: "cargo",
 		Args:    args,
-		Stdout:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
-		Stderr:  bard.NewWriter(c.Logger.Logger.InfoWriter(), bard.WithIndent(3)),
+		Stdout:  bard.NewWriter(c.Logger.InfoWriter(), bard.WithIndent(3)),
+		Stderr:  bard.NewWriter(c.Logger.InfoWriter(), bard.WithIndent(3)),
 	}); err != nil {
 		return fmt.Errorf("unable to install tool\n%w", err)
 	}
@@ -259,10 +259,11 @@ func ParseWorkspaceMember(workspaceMember string) (string, string, string, error
 		if len(otherHalf) == 2 {
 			return strings.TrimSpace(otherHalf[0]), strings.TrimSpace(otherHalf[1]), strings.TrimSpace(half[0]), nil
 		} else {
+			// `url#version` means the package name matches the directory name, so the
+			// URL already points at the package directory.
 			splitIndex := strings.LastIndex(half[0], "/")
-			path := half[0][:splitIndex]
 			pkgName := half[0][splitIndex+1:]
-			return strings.TrimSpace(pkgName), strings.TrimSpace(half[1]), strings.TrimSpace(path), nil
+			return strings.TrimSpace(pkgName), strings.TrimSpace(half[1]), strings.TrimSpace(half[0]), nil
 		}
 
 	} else {
@@ -546,11 +547,12 @@ func archFromSystem() string {
 		archFromEnv = runtime.GOARCH
 	}
 
-	if archFromEnv == "amd64" {
+	switch archFromEnv {
+	case "amd64":
 		return "x86_64"
-	} else if archFromEnv == "arm64" {
+	case "arm64":
 		return "aarch64"
-	} else {
+	default:
 		return archFromEnv
 	}
 }

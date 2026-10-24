@@ -28,8 +28,8 @@ api = "0.7"
     uri = "https://github.com/paketo-community/cargo/blob/main/LICENSE"
 
 [metadata]
-  include-files = ["LICENSE", "NOTICE", "README.md", "buildpack.toml", "linux/amd64/bin/build", "linux/amd64/bin/detect", "linux/amd64/bin/main", "linux/arm64/bin/build", "linux/arm64/bin/detect", "linux/arm64/bin/main"]
-  pre-package = "scripts/build.sh"
+  include-files = ["LICENSE", "NOTICE", "README.md", "buildpack.toml", "linux/amd64/bin/build", "linux/amd64/bin/detect", "linux/amd64/bin/run", "linux/arm64/bin/build", "linux/arm64/bin/detect", "linux/arm64/bin/run"]
+  pre-package = "scripts/build.sh --target linux/amd64 --target linux/arm64"
 
   [[metadata.configurations]]
     build = true
@@ -86,13 +86,16 @@ api = "0.7"
     name = "BP_DISABLE_SBOM"
 
   [[metadata.dependencies]]
-    cpes = ["cpe:2.3:a:tini_project:tini:0.19.0:*:*:*:*:*:*:*"]
+    arch = "amd64"
+    checksum = "sha256:77cce5f4e61954b3420c4465197d8b826a4cf978eba016a9c5859eea0e4c0866"
+    cpe = "cpe:2.3:a:tini_project:tini:0.19.0:*:*:*:*:*:*:*"
     id = "tini"
     name = "Tini"
-    purl = "pkg:generic/tini@v0.19.0?arch=amd64"
+    os = "linux"
+    purl = "pkg:generic/tini@0.19.0?arch=amd64&checksum=77cce5f4e61954b3420c4465197d8b826a4cf978eba016a9c5859eea0e4c0866&download_url=https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-muslc-amd64"
     sha256 = "77cce5f4e61954b3420c4465197d8b826a4cf978eba016a9c5859eea0e4c0866"
     source = "https://github.com/krallin/tini/archive/refs/tags/v0.19.0.tar.gz"
-    source-sha256 = "0fd35a7030052acd9f58948d1d900fe1e432ee37103c5561554408bdac6bbf0d"
+    source-checksum = "sha256:0fd35a7030052acd9f58948d1d900fe1e432ee37103c5561554408bdac6bbf0d"
     stacks = ["*"]
     uri = "https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-muslc-amd64"
     version = "0.19.0"
@@ -102,13 +105,16 @@ api = "0.7"
       uri = "https://github.com/krallin/tini/blob/master/LICENSE"
 
   [[metadata.dependencies]]
-    cpes = ["cpe:2.3:a:tini_project:tini:0.19.0:*:*:*:*:*:*:*"]
+    arch = "arm64"
+    checksum = "sha256:eae1d3aa50c48fb23b8cbdf4e369d0910dfc538566bfd09df89a774aa84a48b9"
+    cpe = "cpe:2.3:a:tini_project:tini:0.19.0:*:*:*:*:*:*:*"
     id = "tini"
     name = "Tini"
-    purl = "pkg:generic/tini@v0.19.0?arch=arm64"
+    os = "linux"
+    purl = "pkg:generic/tini@0.19.0?arch=arm64&checksum=eae1d3aa50c48fb23b8cbdf4e369d0910dfc538566bfd09df89a774aa84a48b9&download_url=https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-arm64"
     sha256 = "eae1d3aa50c48fb23b8cbdf4e369d0910dfc538566bfd09df89a774aa84a48b9"
     source = "https://github.com/krallin/tini/archive/refs/tags/v0.19.0.tar.gz"
-    source-sha256 = "0fd35a7030052acd9f58948d1d900fe1e432ee37103c5561554408bdac6bbf0d"
+    source-checksum = "sha256:0fd35a7030052acd9f58948d1d900fe1e432ee37103c5561554408bdac6bbf0d"
     stacks = ["*"]
     uri = "https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-arm64"
     version = "0.19.0"
@@ -116,6 +122,11 @@ api = "0.7"
     [[metadata.dependencies.licenses]]
       type = "MIT"
       uri = "https://github.com/krallin/tini/blob/master/LICENSE"
+
+  [[metadata.dependency-constraints]]
+    constraint = "0.*"
+    id = "tini"
+    patches = 2
 
 [[stacks]]
   id = "*"
