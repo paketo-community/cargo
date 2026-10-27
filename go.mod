@@ -8,7 +8,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.16
 	github.com/onsi/gomega v1.44.0
 	github.com/paketo-buildpacks/libpak v1.73.0
-	github.com/paketo-buildpacks/source-removal v1.0.45
+	github.com/paketo-buildpacks/source-removal v1.0.46
 	github.com/sclevine/spec v1.4.0
 	github.com/stretchr/testify v1.12.1
 )
