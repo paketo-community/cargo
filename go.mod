@@ -1,6 +1,6 @@
 module github.com/paketo-community/cargo
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/buildpacks/libcnb v1.30.4
