@@ -5,7 +5,7 @@ go 1.27.4
 require (
 	github.com/buildpacks/libcnb v1.30.4
 	github.com/heroku/color v0.0.6
-	github.com/mattn/go-shellwords v1.0.16
+	github.com/mattn/go-shellwords v1.0.17
 	github.com/onsi/gomega v1.44.0
 	github.com/paketo-buildpacks/libpak v1.73.0
 	github.com/paketo-buildpacks/source-removal v1.0.49
